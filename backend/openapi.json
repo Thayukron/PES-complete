@@ -1,61 +1,199 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Teaching API (Minimal)",
-    "version": "1.0.0",
-    "description": "API สำหรับการสอน: Health, Auth, Users CRUD, Upload"
+    "title": "PES API — ระบบประเมินบุคลากร",
+    "version": "2.0.0",
+    "description": "กด Authorize แล้วใส่ accessToken ที่ได้จาก POST /api/auth/login (บัญชีตัวอย่างใช้รหัสผ่าน Pes@2568)"
   },
   "servers": [
     {
-      "url": "http://localhost:7000"
+      "url": "/"
     }
   ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
   "paths": {
     "/health": {
       "get": {
+        "tags": [
+          "System"
+        ],
         "summary": "Health check",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "ok"
           }
         }
       }
     },
     "/api/auth/login": {
       "post": {
-        "summary": "Login (JWT)",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "เข้าสู่ระบบ",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "{ success, accessToken, user }"
+          },
+          "401": {
+            "description": "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
+          },
+          "403": {
+            "description": "บัญชีถูกปิด"
+          }
+        },
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string"
-                  },
-                  "password": {
-                    "type": "string"
-                  }
-                },
                 "required": [
                   "email",
                   "password"
-                ]
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "example": "admin@ccollege.ac.th"
+                  },
+                  "password": {
+                    "type": "string",
+                    "example": "Pes@2568"
+                  }
+                }
               }
             }
           }
-        },
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "ข้อมูลผู้ใช้ปัจจุบัน (ทุกบทบาท)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
-            "description": "success"
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "แก้ไขชื่อตัวเอง (ทุกบทบาท)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name_th"
+                ],
+                "properties": {
+                  "name_th": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/password": {
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "เปลี่ยนรหัสผ่าน (ทุกบทบาท)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "current_password",
+                  "new_password"
+                ],
+                "properties": {
+                  "current_password": {
+                    "type": "string"
+                  },
+                  "new_password": {
+                    "type": "string",
+                    "minLength": 8
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/users": {
       "get": {
-        "summary": "List users",
+        "tags": [
+          "Users"
+        ],
+        "summary": "รายการผู้ใช้ (ค้นหา/แบ่งหน้า) (admin)",
         "security": [
           {
             "bearerAuth": []
@@ -63,66 +201,176 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "-1 = ทั้งหมด"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "department_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortDesc",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ]
       },
       "post": {
-        "summary": "Create user (admin)",
+        "tags": [
+          "Users"
+        ],
+        "summary": "เพิ่มผู้ใช้ (admin)",
         "security": [
           {
             "bearerAuth": []
           }
         ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "email",
+                  "password",
+                  "name_th",
+                  "role"
+                ],
                 "properties": {
-                  "name": {
-                    "type": "string"
-                  },
                   "email": {
                     "type": "string"
                   },
                   "password": {
                     "type": "string"
                   },
+                  "name_th": {
+                    "type": "string"
+                  },
                   "role": {
                     "type": "string",
                     "enum": [
                       "admin",
                       "evaluator",
-                      "user"
+                      "evaluatee"
                     ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "disabled"
+                    ]
+                  },
+                  "department_id": {
+                    "type": "integer"
+                  },
+                  "org_group_id": {
+                    "type": "integer"
                   }
-                },
-                "required": [
-                  "name",
-                  "email",
-                  "password"
-                ]
+                }
               }
             }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created"
           }
         }
       }
     },
     "/api/users/{id}": {
       "get": {
-        "summary": "Get user by id",
+        "tags": [
+          "Users"
+        ],
+        "summary": "ดูผู้ใช้ (admin)",
         "security": [
           {
             "bearerAuth": []
           }
         ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
         "parameters": [
           {
             "name": "id",
@@ -132,23 +380,29 @@
               "type": "integer"
             }
           }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        }
+        ]
       },
       "put": {
-        "summary": "Update user (admin)",
+        "tags": [
+          "Users"
+        ],
+        "summary": "แก้ไขผู้ใช้ (ส่ง password = รีเซ็ตรหัสผ่าน) (admin)",
         "security": [
           {
             "bearerAuth": []
           }
         ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
         "parameters": [
           {
             "name": "id",
@@ -165,284 +419,664 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [],
                 "properties": {
-                  "name": {
-                    "type": "string"
-                  },
                   "email": {
                     "type": "string"
                   },
+                  "password": {
+                    "type": "string"
+                  },
+                  "name_th": {
+                    "type": "string"
+                  },
                   "role": {
-                    "type": "string",
-                    "enum": [
-                      "admin",
-                      "evaluator",
-                      "user"
-                    ]
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "department_id": {
+                    "type": "integer"
+                  },
+                  "org_group_id": {
+                    "type": "integer"
                   }
                 }
               }
             }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated"
           }
         }
       },
       "delete": {
-        "summary": "Delete user (admin)",
+        "tags": [
+          "Users"
+        ],
+        "summary": "ลบผู้ใช้ (ถ้ามีข้อมูลการประเมินจะได้ 409) (admin)",
         "security": [
           {
             "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Deleted"
-          }
-        }
-      }
-    },
-    "/api/upload": {
-      "post": {
-        "summary": "Upload single file",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Uploaded"
-          }
-        }
-      }
-    },
-    "/api/users/server": {
-      "get": {
-        "summary": "List users (server-side pagination)",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 1
-            }
+            "description": "สำเร็จ"
           },
-          {
-            "name": "itemsPerPage",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 10
-            }
-          },
-          {
-            "name": "sortBy",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "id",
-              "enum": [
-                "id",
-                "name",
-                "email",
-                "role",
-                "created_at"
-              ]
-            }
-          },
-          {
-            "name": "sortDesc",
-            "in": "query",
-            "schema": {
-              "type": "boolean",
-              "default": true
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/results": {
-      "get": {
-        "summary": "List evaluation results (IDOR-guarded)",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "period_id",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "user_id",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/results/{id}/submit": {
-      "patch": {
-        "summary": "Submit result (evidence required, only draft)",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "submitted"
-          },
-          "400": {
-            "description": "bad request"
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
           },
           "403": {
-            "description": "forbidden"
+            "description": "ไม่มีสิทธิ์"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
       }
     },
-    "/api/reports/normalized": {
+    "/api/lookups": {
       "get": {
-        "summary": "Normalized score to base (default 60) for submitted results",
+        "tags": [
+          "Master data"
+        ],
+        "summary": "แผนก/ฝ่าย/ชนิดหลักฐาน/ประเภทวิชา (ทุกบทบาท)",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "period_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
           },
-          {
-            "name": "base",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 60
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
           }
         }
       }
     },
-    "/api/reports/progress": {
+    "/api/periods": {
       "get": {
-        "summary": "Progress by department (submitted / total evaluatees)",
+        "tags": [
+          "Periods"
+        ],
+        "summary": "รายการรอบการประเมิน (ทุกบทบาท)",
         "security": [
           {
             "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "period_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
           }
         }
-      }
-    },
-    "/api/assignments": {
+      },
       "post": {
-        "summary": "Create assignment (unique per period/evaluator/evaluatee)",
+        "tags": [
+          "Periods"
+        ],
+        "summary": "เพิ่มรอบ (admin)",
         "security": [
           {
             "bearerAuth": []
           }
         ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "code",
+                  "name_th",
+                  "buddhist_year",
+                  "start_date",
+                  "end_date"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "name_th": {
+                    "type": "string"
+                  },
+                  "buddhist_year": {
+                    "type": "integer"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "is_active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/periods/{id}": {
+      "put": {
+        "tags": [
+          "Periods"
+        ],
+        "summary": "แก้ไขรอบ (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Periods"
+        ],
+        "summary": "ลบรอบ (ต้องยังไม่มีข้อมูล) (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/topics": {
+      "get": {
+        "tags": [
+          "Topics & Indicators"
+        ],
+        "summary": "ด้าน → ตัวชี้วัด → ชนิดหลักฐาน (ทุกบทบาท)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "all",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "admin: 1 = รวมที่ปิดใช้งาน"
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Topics & Indicators"
+        ],
+        "summary": "เพิ่มด้าน (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "title_th"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "title_th": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "weight": {
+                    "type": "number"
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/topics/{id}": {
+      "put": {
+        "tags": [
+          "Topics & Indicators"
+        ],
+        "summary": "แก้ไขด้าน (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Topics & Indicators"
+        ],
+        "summary": "ลบด้าน (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/indicators": {
+      "get": {
+        "tags": [
+          "Topics & Indicators"
+        ],
+        "summary": "รายการตัวชี้วัด (แบบแบน) (ทุกบทบาท)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Topics & Indicators"
+        ],
+        "summary": "เพิ่มตัวชี้วัด (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "topic_id",
+                  "code",
+                  "name_th",
+                  "type"
+                ],
+                "properties": {
+                  "topic_id": {
+                    "type": "integer"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "name_th": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "score_1_4",
+                      "yes_no",
+                      "file_url"
+                    ]
+                  },
+                  "weight": {
+                    "type": "number"
+                  },
+                  "min_score": {
+                    "type": "integer"
+                  },
+                  "max_score": {
+                    "type": "integer"
+                  },
+                  "active": {
+                    "type": "boolean"
+                  },
+                  "evidence_type_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/indicators/{id}": {
+      "put": {
+        "tags": [
+          "Topics & Indicators"
+        ],
+        "summary": "แก้ไขตัวชี้วัด (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Topics & Indicators"
+        ],
+        "summary": "ลบตัวชี้วัด (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/indicators/{id}/evidence-types": {
+      "get": {
+        "tags": [
+          "Topics & Indicators"
+        ],
+        "summary": "ชนิดหลักฐานของตัวชี้วัด (ทุกบทบาท)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/assignments": {
+      "get": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "รายการจับคู่กรรมการ-ครู (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "period_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ไม่ส่ง = รอบที่เปิดอยู่ล่าสุด"
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "จับคู่กรรมการกับครูหลายคน (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "evaluator_id",
+                  "evaluatee_ids"
+                ],
                 "properties": {
                   "period_id": {
                     "type": "integer"
@@ -450,36 +1084,1132 @@
                   "evaluator_id": {
                     "type": "integer"
                   },
-                  "evaluatee_id": {
-                    "type": "integer"
+                  "evaluatee_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
                   }
-                },
-                "required": [
-                  "period_id",
-                  "evaluator_id",
-                  "evaluatee_id"
-                ]
+                }
               }
             }
           }
-        },
+        }
+      }
+    },
+    "/api/assignments/{id}": {
+      "delete": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "ยกเลิกการจับคู่ (force=1 ลบผลคะแนนด้วย) (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
-          "201": {
-            "description": "Created"
+          "200": {
+            "description": "สำเร็จ"
           },
-          "409": {
-            "description": "Duplicate"
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/assignments/mine": {
+      "get": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "ครูที่ฉันต้องประเมิน + ความคืบหน้า (evaluator)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "period_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ไม่ส่ง = รอบที่เปิดอยู่ล่าสุด"
+          }
+        ]
+      }
+    },
+    "/api/attachments": {
+      "get": {
+        "tags": [
+          "Attachments"
+        ],
+        "summary": "รายการไฟล์หลักฐาน (ทุกบทบาท ตามสิทธิ์)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "period_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ไม่ส่ง = รอบที่เปิดอยู่ล่าสุด"
+          },
+          {
+            "name": "evaluatee_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ครูไม่ต้องส่ง"
+          },
+          {
+            "name": "indicator_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Attachments"
+        ],
+        "summary": "อัปโหลดหลักฐาน (multipart/form-data) (evaluatee)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "period_id",
+                  "indicator_id",
+                  "evidence_type_id"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "period_id": {
+                    "type": "integer"
+                  },
+                  "indicator_id": {
+                    "type": "integer"
+                  },
+                  "evidence_type_id": {
+                    "type": "integer"
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
           }
         }
       }
-    }
-  },
-  "components": {
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT"
+    },
+    "/api/attachments/{id}/file": {
+      "get": {
+        "tags": [
+          "Attachments"
+        ],
+        "summary": "ดาวน์โหลด/เปิดไฟล์ (inline=1) (เจ้าของ, กรรมการที่จับคู่, admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "inline",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/attachments/{id}": {
+      "delete": {
+        "tags": [
+          "Attachments"
+        ],
+        "summary": "ลบไฟล์ (เจ้าของ/admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/self-assessments": {
+      "get": {
+        "tags": [
+          "Evaluation"
+        ],
+        "summary": "ผลประเมินตนเอง (ทุกบทบาท ตามสิทธิ์)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "period_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ไม่ส่ง = รอบที่เปิดอยู่ล่าสุด"
+          },
+          {
+            "name": "evaluatee_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Evaluation"
+        ],
+        "summary": "บันทึกร่าง/ส่งประเมินตนเอง (evaluatee)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "items"
+                ],
+                "properties": {
+                  "period_id": {
+                    "type": "integer"
+                  },
+                  "submit": {
+                    "type": "boolean"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "indicator_id": {
+                          "type": "integer"
+                        },
+                        "score": {
+                          "type": "number"
+                        },
+                        "value_yes_no": {
+                          "type": "integer"
+                        },
+                        "notes": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/self-assessments/reopen": {
+      "post": {
+        "tags": [
+          "Evaluation"
+        ],
+        "summary": "เปิดให้ครูแก้ไขประเมินตนเอง (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "evaluatee_id"
+                ],
+                "properties": {
+                  "period_id": {
+                    "type": "integer"
+                  },
+                  "evaluatee_id": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/results": {
+      "get": {
+        "tags": [
+          "Evaluation"
+        ],
+        "summary": "ผลคะแนนของกรรมการ (evaluator/admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "period_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ไม่ส่ง = รอบที่เปิดอยู่ล่าสุด"
+          },
+          {
+            "name": "evaluatee_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "evaluator_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "เฉพาะ admin"
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Evaluation"
+        ],
+        "summary": "บันทึกร่าง/ส่งผลการประเมิน (evaluator)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "evaluatee_id",
+                  "items"
+                ],
+                "properties": {
+                  "period_id": {
+                    "type": "integer"
+                  },
+                  "evaluatee_id": {
+                    "type": "integer"
+                  },
+                  "comment": {
+                    "type": "string"
+                  },
+                  "submit": {
+                    "type": "boolean"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "indicator_id": {
+                          "type": "integer"
+                        },
+                        "score": {
+                          "type": "number"
+                        },
+                        "value_yes_no": {
+                          "type": "integer"
+                        },
+                        "notes": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/results/reopen": {
+      "post": {
+        "tags": [
+          "Evaluation"
+        ],
+        "summary": "เปิดให้กรรมการแก้ไขผล (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "evaluatee_id",
+                  "evaluator_id"
+                ],
+                "properties": {
+                  "period_id": {
+                    "type": "integer"
+                  },
+                  "evaluatee_id": {
+                    "type": "integer"
+                  },
+                  "evaluator_id": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "ตัวเลขสรุปตามบทบาท (ทุกบทบาท)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "period_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ไม่ส่ง = รอบที่เปิดอยู่ล่าสุด"
+          }
+        ]
+      }
+    },
+    "/api/reports/summary": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "สรุปผลรายบุคคล (admin/evaluator)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "period_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ไม่ส่ง = รอบที่เปิดอยู่ล่าสุด"
+          },
+          {
+            "name": "department_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/reports/evaluatee/{id}": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "รายงานรายบุคคลแบบละเอียด (admin, กรรมการที่จับคู่, ครูเจ้าของ)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "period_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ไม่ส่ง = รอบที่เปิดอยู่ล่าสุด"
+          }
+        ]
+      }
+    },
+    "/api/departments": {
+      "post": {
+        "tags": [
+          "Master data"
+        ],
+        "summary": "เพิ่มแผนกวิชา (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "name_th"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "name_th": {
+                    "type": "string"
+                  },
+                  "category_id": {
+                    "type": "integer"
+                  },
+                  "org_group_id": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/departments/{id}": {
+      "put": {
+        "tags": [
+          "Master data"
+        ],
+        "summary": "แก้ไขแผนกวิชา (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "name_th": {
+                    "type": "string"
+                  },
+                  "category_id": {
+                    "type": "integer"
+                  },
+                  "org_group_id": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Master data"
+        ],
+        "summary": "ลบแผนกวิชา (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/org-groups": {
+      "post": {
+        "tags": [
+          "Master data"
+        ],
+        "summary": "เพิ่มฝ่าย (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "name_th"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "name_th": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/org-groups/{id}": {
+      "put": {
+        "tags": [
+          "Master data"
+        ],
+        "summary": "แก้ไขฝ่าย (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "name_th": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Master data"
+        ],
+        "summary": "ลบฝ่าย (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/evidence-types": {
+      "post": {
+        "tags": [
+          "Master data"
+        ],
+        "summary": "เพิ่มชนิดหลักฐาน (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "name_th"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "name_th": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence-types/{id}": {
+      "put": {
+        "tags": [
+          "Master data"
+        ],
+        "summary": "แก้ไขชนิดหลักฐาน (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "name_th": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Master data"
+        ],
+        "summary": "ลบชนิดหลักฐาน (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "สำเร็จ"
+          },
+          "401": {
+            "description": "ยังไม่ล็อกอิน"
+          },
+          "403": {
+            "description": "ไม่มีสิทธิ์"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
       }
     }
   }

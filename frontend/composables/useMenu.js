@@ -1,87 +1,53 @@
-// ~/composables/useMenu.js
-import { ref, isRef, computed } from 'vue'
-
-// ถ้า backend ส่ง 'evaluatee' ให้ map มาเป็น 'user'
-function normalizeRole(r) {
-  const x = (r || '').toString().toLowerCase()
-  if (x === 'evaluatee') return 'user'
-  return ['admin', 'evaluator', 'user'].includes(x) ? x : 'user'
-}
-
-const MAP = {
+// เมนูด้านซ้ายตามบทบาทผู้ใช้
+const MENUS = {
   admin: [
+    { label: 'หน้าหลัก', items: [{ label: 'แดชบอร์ด', to: '/', icon: 'mdi-view-dashboard-outline' }] },
     {
-      label: 'MAIN',
+      label: 'การประเมิน',
       items: [
-        { label: 'Dashboard', to: '/',              icon: 'mdi-view-dashboard-outline' },
-        { label: 'Upload',    to: '/upload',        icon: 'mdi-tray-arrow-up' },
-      ]
+        { label: 'ติดตามความคืบหน้า', to: '/admin/monitor', icon: 'mdi-progress-check' },
+        { label: 'รายงานผลการประเมิน', to: '/admin/reports', icon: 'mdi-chart-box-outline' },
+        { label: 'จับคู่กรรมการ', to: '/admin/assignments', icon: 'mdi-account-multiple-check-outline' },
+      ],
     },
     {
-      label: 'MANAGEMENT',
+      label: 'ตั้งค่าระบบ',
       items: [
-        { label: 'Users',         to: '/users',            icon: 'mdi-account-cog-outline' },
-        { label: 'Periods',       to: '/admin/periods',    icon: 'mdi-calendar-range' },
-        { label: 'Topics',        to: '/admin/topics',     icon: 'mdi-format-list-bulleted' },
-        { label: 'Assignments',   to: '/admin/assignments',icon: 'mdi-account-multiple-check' },
-        { label: 'Monitor',       to: '/admin/monitor',    icon: 'mdi-progress-check' },
-        { label: 'Reports',       to: '/reports',          icon: 'mdi-chart-areaspline' },
-        { label: 'Settings',      to: '/settings',         icon: 'mdi-cog-outline' },
-        { label: 'API Docs', href: 'http://localhost:7000/docs', target: '_blank', icon: 'mdi-book-open-outline' },
-      ]
-    }
+        { label: 'ผู้ใช้งาน', to: '/admin/users', icon: 'mdi-account-cog-outline' },
+        { label: 'รอบการประเมิน', to: '/admin/periods', icon: 'mdi-calendar-range' },
+        { label: 'ด้านและตัวชี้วัด', to: '/admin/topics', icon: 'mdi-format-list-checks' },
+        { label: 'ข้อมูลพื้นฐาน', to: '/admin/settings', icon: 'mdi-cog-outline' },
+        { label: 'API Docs', href: '/docs/', icon: 'mdi-book-open-variant' },
+      ],
+    },
   ],
-
   evaluator: [
+    { label: 'หน้าหลัก', items: [{ label: 'แดชบอร์ด', to: '/', icon: 'mdi-view-dashboard-outline' }] },
     {
-      label: 'MAIN',
+      label: 'งานประเมิน',
       items: [
-        { label: 'Dashboard', to: '/',       icon: 'mdi-view-dashboard-outline' },
-        { label: 'Upload',    to: '/upload', icon: 'mdi-tray-arrow-up' },
-      ]
+        { label: 'รายชื่อผู้รับการประเมิน', to: '/eval/tasks', icon: 'mdi-clipboard-account-outline' },
+        { label: 'สรุปผลการประเมิน', to: '/eval/results', icon: 'mdi-file-chart-outline' },
+      ],
     },
-    {
-      label: 'EVALUATION',
-      items: [
-        { label: 'Assigned Tasks',  to: '/eval/tasks',   icon: 'mdi-clipboard-check-outline' },
-        { label: 'Scoring',         to: '/eval/scoring', icon: 'mdi-lead-pencil' },
-        { label: 'Results',         to: '/eval/results', icon: 'mdi-file-check-outline' },
-        { label: 'Users',           to: '/users',        icon: 'mdi-account-multiple-outline' },
-        { label: 'API Docs', href: 'http://localhost:7000/docs', target: '_blank', icon: 'mdi-book-open-outline' },
-      ]
-    }
   ],
-
-  user: [
+  evaluatee: [
+    { label: 'หน้าหลัก', items: [{ label: 'แดชบอร์ด', to: '/', icon: 'mdi-view-dashboard-outline' }] },
     {
-      label: 'MAIN',
+      label: 'การประเมินของฉัน',
       items: [
-        { label: 'Dashboard', to: '/',           icon: 'mdi-view-dashboard-outline' },
-        { label: 'Upload',    to: '/upload',     icon: 'mdi-tray-arrow-up' }, // ✅ บังคับมีแน่
-      ]
+        { label: 'ตัวชี้วัด', to: '/me/indicators', icon: 'mdi-format-list-bulleted-square' },
+        { label: 'อัปโหลดหลักฐาน', to: '/me/evidence', icon: 'mdi-tray-arrow-up' },
+        { label: 'ประเมินตนเอง', to: '/me/self-assessment', icon: 'mdi-star-check-outline' },
+        { label: 'ความคืบหน้า', to: '/me/progress', icon: 'mdi-progress-clock' },
+        { label: 'ผลการประเมินและข้อเสนอแนะ', to: '/me/results', icon: 'mdi-message-text-outline' },
+        { label: 'พิมพ์/ส่งออกรายงาน', to: '/report/me', icon: 'mdi-printer-outline' },
+      ],
     },
-    {
-      label: 'MY EVALUATION',
-      items: [
-        { label: 'Profile',         to: '/me',             icon: 'mdi-account' },
-        { label: 'Indicators',      to: '/me/indicators',  icon: 'mdi-format-list-bulleted-square' },
-        { label: 'Self Assessment', to: '/me/self-score',  icon: 'mdi-star-check-outline' },
-        { label: 'Progress',        to: '/me/progress',    icon: 'mdi-progress-clock' },
-        { label: 'Export',          to: '/me/export',      icon: 'mdi-tray-arrow-down' },
-        { label: 'Feedback',        to: '/me/feedback',    icon: 'mdi-message-draw' },
-      ]
-    }
-  ]
+  ],
 }
 
-export function useMenu(roleInput = 'user') {
-  const r = isRef(roleInput) ? roleInput : ref(roleInput)
-
-  // ให้เมนูปลอดภัยแม้ role ยังไม่พร้อม (ตอน hydrate แรก ๆ)
-  const menu = computed(() => {
-    const key = normalizeRole(r.value)
-    return MAP[key] || MAP.user
-  })
-
-  return { menu }
+export function useMenu() {
+  const auth = useAuthStore()
+  return computed(() => MENUS[auth.role] || [])
 }

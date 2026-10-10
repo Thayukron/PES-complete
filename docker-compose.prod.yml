@@ -1,0 +1,62 @@
+# ระบบประเมินบุคลากร (PES) — Production (ใช้ image ที่ build จาก GitLab CI)
+# ต้องมีไฟล์ deploy/backend.env (ดู deploy/backend.env.example)
+# เริ่ม:  REGISTRY_IMAGE=registry.example/group/pes IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
+
+services:
+  db:
+    image: mysql:8.0
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    env_file: ./deploy/backend.env
+    environment:
+      MYSQL_DATABASE: skills_db
+      TZ: Asia/Bangkok
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./schema.sql:/docker-entrypoint-initdb.d/00-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [pes_net]
+    restart: unless-stopped
+
+  api:
+    image: ${REGISTRY_IMAGE}/backend:${IMAGE_TAG:-latest}
+    env_file: ./deploy/backend.env
+    environment:
+      DB_HOST: db
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [pes_net]
+    restart: unless-stopped
+
+  frontend:
+    image: ${REGISTRY_IMAGE}/frontend:${IMAGE_TAG:-latest}
+    environment:
+      NUXT_API_INTERNAL: http://api:7000
+    ports: ["${WEB_PORT:-3000}:3000"]
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [pes_net]
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  uploads:
+
+networks:
+  pes_net:
+    driver: bridge

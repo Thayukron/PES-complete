@@ -1,6 +1,7 @@
 // backend/db/knex.js
+// ตัวเชื่อมต่อ MySQL ผ่าน Knex (ใช้ร่วมกันทุก controller)
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') }); // << เพิ่มบรรทัดนี้
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 const knex = require('knex');
 
@@ -10,20 +11,13 @@ const db = knex({
     host: process.env.DB_HOST || '127.0.0.1',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASS || process.env.DB_PASSWORD || 'rootpassword',
-    // password: process.env.DB_PASS || '', // สำหรับ XAMPP
     database: process.env.DB_NAME || 'skills_db',
     port: Number(process.env.DB_PORT) || 3306,
+    charset: 'utf8mb4',
+    dateStrings: true, // คืนค่า DATE/TIMESTAMP เป็น string ไม่ให้ timezone เลื่อน
     connectTimeout: 15000,
   },
   pool: { min: 0, max: 10, acquireTimeoutMillis: 20000 },
 });
 
-// ช่วยตรวจว่าโหลดค่าถูกจริง
-console.log('[DB-CONFIG]', {
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  db: process.env.DB_NAME,
-});
-
 module.exports = db;
-

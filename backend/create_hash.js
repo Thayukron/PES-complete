@@ -1,15 +1,10 @@
+// สร้าง bcrypt hash สำหรับใส่ในฐานข้อมูลด้วยมือ
+// ใช้: node create_hash.js "รหัสผ่านที่ต้องการ"
 const bcrypt = require('bcrypt');
 
-const password = '12345678'; // รหัสผ่านที่ต้องการเข้ารหัส
-// const password = '12345678'; // รหัสผ่านที่ต้องการเข้ารหัส
-const saltRounds = 10; // ค่า cost factor ที่แนะนำ
-
-bcrypt.hash(password,saltRounds, (err, hash) => {
-  if (err) {
-    console.error('Error hashing password:', err);
-  } else {
-    console.log('Hashed password:', hash);
-  }
-});
-// นำเข้าโมดูล bcrypt สำหรับการเข้ารหัสรหัสผ่าน      
-    
+const password = process.argv[2];
+if (!password) {
+  console.error('ใช้: node create_hash.js "<password>"');
+  process.exit(1);
+}
+bcrypt.hash(password, 10).then((hash) => console.log(hash));

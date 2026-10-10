@@ -1,16 +1,17 @@
 # Node.js
 node_modules/
 npm-debug.log
-.env
-build/
-dist/
-
-# Logs
 *.log
 
+# Secrets (ใช้ .env.example เป็นต้นแบบ)
+.env
+.env.*
+!.env.example
+deploy/*.env
+
 # Build artifacts
-dist/
-build/
 frontend/.nuxt/
 frontend/.output/
+
+# ไฟล์ที่ผู้ใช้อัปโหลด
 backend/uploads/

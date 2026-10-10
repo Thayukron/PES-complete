@@ -1,72 +1,57 @@
-// const multer = require('multer');
-// const path = require('path');
-
-// const storage = multer.diskStorage({
-//   destination: (req, file, cb) => cb(null, 'uploads'),
-//   filename: (req, file, cb) => {
-//     const unique = 'std-it-' + Date.now() + path.extname(file.originalname);
-//     cb(null, unique);
-//   }
-// });
-
-// module.exports = multer({ storage });
 // middlewares/upload.js
+// รับไฟล์หลักฐานด้วย multer: เก็บที่ uploads/<evaluatee_id>/<timestamp>_<ชื่อไฟล์>
+// ต้องวางหลัง auth() เสมอ เพราะใช้ req.user.id เป็นชื่อโฟลเดอร์
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+const UPLOAD_ROOT = path.join(__dirname, '..', 'uploads');
 const MAX_MB = Number(process.env.UPLOAD_MAX_MB || 10);
-const MAX_BYTES = MAX_MB * 1024 * 1024;
 
-// อนุญาต mimetype ทั่วไป (แนะนำ: map ตาม evidence_type ในชั้น controller เพิ่มเติม)
-const ALLOWED = new Set([
-  'application/pdf',
-  'image/png', 'image/jpeg', 'image/webp',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'application/zip', 'application/x-zip-compressed'
-]);
+// ชนิดไฟล์ที่อนุญาต (ตรงกับที่แสดงในหน้าอัปโหลด)
+const ALLOWED = {
+  'application/pdf': 'PDF',
+  'image/png': 'PNG',
+  'image/jpeg': 'JPG',
+  'image/webp': 'WEBP',
+  'application/msword': 'DOC',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+  'application/vnd.ms-excel': 'XLS',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX',
+  'application/vnd.ms-powerpoint': 'PPT',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PPTX',
+  'application/zip': 'ZIP',
+  'application/x-zip-compressed': 'ZIP',
+};
 
-function ensureDir(dir) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-}
+// multer อ่านชื่อไฟล์เป็น latin1 ต้องแปลงกลับเป็น utf8 ไม่งั้นชื่อไฟล์ภาษาไทยจะเพี้ยน
+const decodeName = (name) => Buffer.from(name, 'latin1').toString('utf8');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // ใช้ period_id + evaluatee_id (จาก JWT หรือ body สำหรับ admin)
-    console.log('__dirname', __dirname);
-    const base = path.join(__dirname, '..', 'uploads');
-    const period = String(req.body.period_id || 'misc');
-    const evaluatee = String((req.user && req.user.id) || req.body.evaluatee_id || 'unknown');
-    const dest = path.join(base, period, evaluatee);
-    ensureDir(dest);
-    console.log('Upload destination:', dest);
+    const dest = path.join(UPLOAD_ROOT, String(req.user.id));
+    fs.mkdirSync(dest, { recursive: true });
     cb(null, dest);
   },
   filename: (req, file, cb) => {
+    file.originalname = decodeName(file.originalname);
     const ext = path.extname(file.originalname).toLowerCase();
-    const safe = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9._-]/g, '_');
-    const name = `${Date.now()}_${safe}${ext}`;
-    cb(null, name);
-  }
+    cb(null, `${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
+  },
 });
 
 function fileFilter(req, file, cb) {
-  if (!ALLOWED.has(file.mimetype)) {
-    return cb(new Error('Unsupported file type'), false);
+  if (!ALLOWED[file.mimetype]) {
+    const err = new Error('ชนิดไฟล์ไม่รองรับ (รองรับ: ' + [...new Set(Object.values(ALLOWED))].join(', ') + ')');
+    err.status = 400;
+    return cb(err, false);
   }
   cb(null, true);
 }
 
+const upload = multer({ storage, fileFilter, limits: { fileSize: MAX_MB * 1024 * 1024 } });
 
-const upload = multer({ storage, fileFilter, limits: { fileSize: MAX_BYTES } });
-module.exports = upload;   // ← export อินสแตนซ์ตรง ๆ
-
-// function single(field) {
-//   return multer({ storage, fileFilter, limits: { fileSize: MAX_BYTES } }).single(field);
-// }
-// module.exports = { single };
+module.exports = upload;
+module.exports.UPLOAD_ROOT = UPLOAD_ROOT;
+module.exports.ALLOWED = ALLOWED;
+module.exports.MAX_MB = MAX_MB;

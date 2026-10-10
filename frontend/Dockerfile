@@ -1,8 +1,15 @@
+# ---- build ----
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# ---- run ----
 FROM node:20-alpine
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci || npm install
-COPY . .
-# ENV NUXT_PUBLIC_API_BASE=http://api:7000
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
+COPY --from=build /app/.output ./.output
 EXPOSE 3000
-CMD ["npm","run","dev"]
+CMD ["node", ".output/server/index.mjs"]

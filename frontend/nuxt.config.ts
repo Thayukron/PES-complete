@@ -1,74 +1,34 @@
-// // https://nuxt.com/docs/api/configuration/nuxt-config
-// import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
-
-// export default defineNuxtConfig({
-//   modules: ['@pinia/nuxt'],
-//   devtools: { enabled: false },
-//   runtimeConfig: {
-//     public: {
-//       // apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:7000'
-//        apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:7000'
-//     }
-//   },
-//   css: [
-//     'vuetify/styles',
-//     '~/assets/css/tailwind.css'
-//   ],
-//   build: {
-//     transpile: ['vuetify']
-//   },
-//   vite: {
-//     ssr: {
-//       noExternal: ['vuetify']
-//     },
-//     plugins: [
-//       vuetify({ autoImport: true })
-//     ],
-//     vue: {
-//       template: {
-//         transformAssetUrls
-//       }
-//     }
-//   }
-// })
-
 // nuxt.config.ts
 import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
 
 export default defineNuxtConfig({
-   // ✅ ตั้งค่า compatibilityDate ตามที่ Nuxt เตือน
- nitro: {
-    compatibilityDate: '2025-10-12', // 🔥 วันที่ตามที่ Nuxt แนะนำใน warning
-  },
-
-  modules: ['@pinia/nuxt'],
-   pinia: {
-    autoImports: ['defineStore', 'storeToRefs']
-  },
+  compatibilityDate: '2025-10-12',
+  // ระบบภายในที่ต้องล็อกอิน -> ใช้โหมด SPA (ไม่ต้องเรนเดอร์ฝั่ง server, ไม่มีปัญหา localStorage)
+  ssr: false,
   devtools: { enabled: false },
- runtimeConfig: {
-    public: {
-      // apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:7000'
-       apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:7000'
-    }
-  },
-  // ✅ ย้าย PostCSS มาตั้งค่าที่นี่
-  postcss: {
-    plugins: {
-      tailwindcss: {},
-      autoprefixer: {},
+  modules: ['@pinia/nuxt'],
+
+  app: {
+    head: {
+      htmlAttrs: { lang: 'th' },
+      title: 'ระบบประเมินบุคลากร',
+      meta: [{ name: 'viewport', content: 'width=device-width, initial-scale=1' }],
+      link: [{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
     },
   },
-  css: [
-    'vuetify/styles',
-    '@mdi/font/css/materialdesignicons.min.css', 
-    '~/assets/css/tailwind.css'
-  ],
 
+  runtimeConfig: {
+    // ที่อยู่ API ภายใน (ฝั่ง server ของ Nuxt ใช้ส่งต่อคำขอ /api/**) — override ด้วย env NUXT_API_INTERNAL
+    apiInternal: 'http://localhost:7000',
+    public: {
+      appName: 'ระบบประเมินบุคลากร (PES)',
+    },
+  },
+
+  css: ['vuetify/styles', '@mdi/font/css/materialdesignicons.min.css', '~/assets/main.css'],
   build: { transpile: ['vuetify'] },
   vite: {
-    ssr: { noExternal: ['vuetify'] },
     plugins: [vuetify({ autoImport: true })],
-    vue: { template: { transformAssetUrls } }
-  }
+    vue: { template: { transformAssetUrls } },
+  },
 })

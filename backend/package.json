@@ -1,15 +1,13 @@
 {
-  "name": "backend-api-minimal",
+  "name": "pes-backend",
   "version": "1.0.0",
   "type": "commonjs",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "lint": "echo \"(optional)\"",
     "test": "vitest run",
-    "test:watch": "vitest",
-     "test1": "jest --runInBand"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
@@ -21,12 +19,12 @@
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.9.7",
-    "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.0",
     "supertest": "^7.0.0",
     "vitest": "^3.2.4"
-  }
+  },
+  "description": "ระบบประเมินบุคลากร (PES) — Backend API"
 }

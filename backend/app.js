@@ -1,76 +1,43 @@
-const express = require("express");
-const cors = require("cors");
-const morgan = require("morgan");
-const path = require("path");
-const dotenv = require("dotenv");
-const attachmentsApi = require("./routes/attachments");   // << เพิ่มบรรทัดนี้
-// Swagger
-const swaggerUi = require("swagger-ui-express");
-const fs = require("fs");
+// app.js — ตั้งค่า Express (แยกจาก server.js เพื่อให้ทดสอบด้วย supertest ได้)
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
+const path = require('path');
+const dotenv = require('dotenv');
+const swaggerUi = require('swagger-ui-express');
 
 dotenv.config();
+if (!process.env.JWT_SECRET) {
+  throw new Error('ต้องตั้งค่า JWT_SECRET ในไฟล์ .env ก่อนเริ่มระบบ');
+}
 
 const app = express();
+app.disable('x-powered-by');
 
 app.use(cors({ origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : '*' }));
-// app.use(cors());
-app.use(express.urlencoded({ extended: true }));  // ใส่คู่กับ express.json()
-app.use(express.json());
-app.use(morgan("dev"));
-app.get('/oak',function(req,res){ 
-  console.log("req=",req.query)
-    res.send({
-      status: 'Hello World oak!',
-      data: req.query
-      })
-});
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use("/public", express.static(path.join(__dirname, "public")));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true }));
+if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 
-// Health
-//http://localhost:7000/health
-app.get("/health", (req, res) => {
-  res.json({ service: "okoak", time: new Date().toISOString() });
+// หมายเหตุ: ไม่เปิด /uploads เป็น static แล้ว — ดาวน์โหลดไฟล์ผ่าน /api/attachments/:id/file ที่ตรวจสิทธิ์เท่านั้น
+
+// Health check (ใช้กับ docker healthcheck / CI)
+app.get('/health', (req, res) => {
+  res.json({ service: 'pes-api', status: 'ok', time: new Date().toISOString() });
 });
 
-// ให้ /openapi.json ส่งไฟล์จริงแบบ no-store เพื่อไม่ให้แคช
-app.get("/openapi.json", (req, res) => {
-  res.set("Cache-Control", "no-store");
-  res.sendFile(path.join(__dirname, "openapi.json"));
+// เอกสาร API (Swagger)
+app.get('/openapi.json', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.sendFile(path.join(__dirname, 'openapi.json'));
 });
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(null, { swaggerOptions: { url: '/openapi.json' } }));
 
-// ให้ Swagger UI ไปดึงสเปกจาก URL ด้านบน (สดใหม่เสมอ)
-app.use(
-  "/docs",
-  swaggerUi.serve,
-  swaggerUi.setup(null, {
-    swaggerOptions: { url: "/openapi.json" },
-  })
-);
-const userRoutes = require("./routes/users.routes");
-const authRoutes = require("./routes/auth.routes");
-const uploadRoutes = require("./routes/upload.routes");
+app.use('/api', require('./routes'));
 
-// http://localhost:7000/api/auth/login
-// app.use('/api/auth', require('./routes/auth.routes'));
-app.use("/api/auth", authRoutes);
-// http://localhost:7000/api/users
-app.use("/api/users", userRoutes);
-// http://localhost:7000/api/upload
-app.use("/api/upload", uploadRoutes);
-// จะได้ /api/periods/active, /api/indicators, ...
-
-// << เส้นทางสำหรับ Period/Indicator/EvidenceType และ POST /attachments
-app.use("/api", attachmentsApi);           // จะได้ /api/periods/active, /api/indicators, ...
-
-
-app.use((req, res, next) => {
-  res.status(404).json({ success: false, message: "ไม่พบหน้านี้" });
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: 'ไม่พบเส้นทางที่ร้องขอ' });
 });
-
-// Error handler
-const error = require("./middlewares/error");
-app.use(error);
-// console.log(module);// Debug: log the module object to see its properties
+app.use(require('./middlewares/error'));
 
 module.exports = app;

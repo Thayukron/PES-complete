@@ -11,6 +11,8 @@ USE skills_db;
 -- Drop old objects (order matters)
 DROP VIEW IF EXISTS v_evidence_progress;
 
+DROP TABLE IF EXISTS evaluation_feedback;
+DROP TABLE IF EXISTS self_assessments;
 DROP TABLE IF EXISTS attachments;
 DROP TABLE IF EXISTS evaluation_results;
 DROP TABLE IF EXISTS assignments;
@@ -199,6 +201,7 @@ CREATE TABLE evaluation_results (
   CONSTRAINT fk_res_evalr   FOREIGN KEY (evaluator_id) REFERENCES users(id)              ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT fk_res_topic   FOREIGN KEY (topic_id)     REFERENCES evaluation_topics(id)  ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT fk_res_ind     FOREIGN KEY (indicator_id) REFERENCES indicators(id)         ON DELETE RESTRICT ON UPDATE CASCADE,
+  UNIQUE KEY uniq_result (period_id, evaluatee_id, evaluator_id, indicator_id),
   KEY idx_results_evale (evaluatee_id, period_id),
   KEY idx_results_indicator (indicator_id)
 ) ENGINE=InnoDB;
@@ -213,12 +216,46 @@ CREATE TABLE attachments (
   mime_type VARCHAR(100) NOT NULL,
   size_bytes INT UNSIGNED NOT NULL,
   storage_path VARCHAR(1024) NOT NULL,
+  note VARCHAR(255) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_att_period  FOREIGN KEY (period_id)       REFERENCES evaluation_periods(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_att_evale   FOREIGN KEY (evaluatee_id)    REFERENCES users(id)              ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_att_ind     FOREIGN KEY (indicator_id)    REFERENCES indicators(id)         ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_att_evtype  FOREIGN KEY (evidence_type_id) REFERENCES evidence_types(id)    ON DELETE RESTRICT ON UPDATE CASCADE,
   KEY idx_attach_evale (evaluatee_id, period_id)
+) ENGINE=InnoDB;
+
+-- ผลการประเมินตนเองของครู (1 แถวต่อ 1 ตัวชี้วัด)
+CREATE TABLE self_assessments (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  period_id BIGINT UNSIGNED NOT NULL,
+  evaluatee_id BIGINT UNSIGNED NOT NULL,
+  indicator_id BIGINT UNSIGNED NOT NULL,
+  score DECIMAL(5,2) NULL,
+  value_yes_no TINYINT(1) NULL,
+  notes TEXT NULL,
+  status ENUM('draft','submitted') NOT NULL DEFAULT 'draft',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_sa_period FOREIGN KEY (period_id)    REFERENCES evaluation_periods(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_sa_evale  FOREIGN KEY (evaluatee_id) REFERENCES users(id)              ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_sa_ind    FOREIGN KEY (indicator_id) REFERENCES indicators(id)         ON DELETE CASCADE ON UPDATE CASCADE,
+  UNIQUE KEY uniq_sa (period_id, evaluatee_id, indicator_id)
+) ENGINE=InnoDB;
+
+-- ข้อเสนอแนะภาพรวมจากกรรมการถึงครู (1 แถวต่อกรรมการ 1 คน ต่อครู 1 คน ต่อรอบ)
+CREATE TABLE evaluation_feedback (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  period_id BIGINT UNSIGNED NOT NULL,
+  evaluatee_id BIGINT UNSIGNED NOT NULL,
+  evaluator_id BIGINT UNSIGNED NOT NULL,
+  comment TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_fb_period FOREIGN KEY (period_id)    REFERENCES evaluation_periods(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_fb_evale  FOREIGN KEY (evaluatee_id) REFERENCES users(id)              ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_fb_evalr  FOREIGN KEY (evaluator_id) REFERENCES users(id)              ON DELETE CASCADE ON UPDATE CASCADE,
+  UNIQUE KEY uniq_fb (period_id, evaluatee_id, evaluator_id)
 ) ENGINE=InnoDB;
 
 -- Helpful indexes
@@ -360,19 +397,19 @@ SELECT d.id, '20201' FROM departments d WHERE d.code='ACC';
 INSERT INTO dept_fields (dept_id, field_code)
 SELECT d.id, '20202' FROM departments d WHERE d.code='MKT';
 
--- Users (แก้เป็น password_hash ให้ตรงสคีมา)
+-- Users — ทุกบัญชีตัวอย่างใช้รหัสผ่าน: Pes@2568 (ควรเปลี่ยนหลังติดตั้งจริง)
 INSERT INTO users (email, password_hash, name_th, role, department_id, org_group_id) VALUES
-('admin@ccollege.ac.th', '$2b$10$f6g9QMzpdIjzUyckEbFLIeuSRKEGJdNSu.TZ3tmegQ5ioSop02og6', 'ผู้ดูแลระบบ', 'admin',
+('admin@ccollege.ac.th', '$2a$10$RITdychQz3LxlKF.o5FoCeruIWc0Y6Pr/IVx2d1XdBgw7WF66T6Ve', 'ผู้ดูแลระบบ', 'admin',
  (SELECT id FROM departments WHERE code='IT'), (SELECT id FROM org_groups WHERE code='ACD')),
-('eva.me@ccollege.ac.th', '$2b$10$ycxCewoT/qjuiZiDb7hfP.aGEnWZu8rMF3UzRO6QgxgIO7lKLsRSm', 'กรรมการประเมินเครื่องกล', 'evaluator',
+('eva.me@ccollege.ac.th', '$2a$10$RITdychQz3LxlKF.o5FoCeruIWc0Y6Pr/IVx2d1XdBgw7WF66T6Ve', 'กรรมการประเมินเครื่องกล', 'evaluator',
  (SELECT id FROM departments WHERE code='ME'), (SELECT id FROM org_groups WHERE code='ACD')),
-('eva.it@ccollege.ac.th', '$2b$10$rCg8BVUQSVs51Hb/fwctneQcBfIE0RL5dVRm1bcX5CPyGKyRAxFoe', 'กรรมการประเมินไอที', 'evaluator',
+('eva.it@ccollege.ac.th', '$2a$10$RITdychQz3LxlKF.o5FoCeruIWc0Y6Pr/IVx2d1XdBgw7WF66T6Ve', 'กรรมการประเมินไอที', 'evaluator',
  (SELECT id FROM departments WHERE code='IT'), (SELECT id FROM org_groups WHERE code='ACD')),
-('t.it01@ccollege.ac.th', '$2b$10$V0GTPQ/2Ap5r0nzE49FjfOW7xmXuSPQ8m7P81jwKrFFltwCvBXTsy', 'ครูไอที 01', 'evaluatee',
+('t.it01@ccollege.ac.th', '$2a$10$RITdychQz3LxlKF.o5FoCeruIWc0Y6Pr/IVx2d1XdBgw7WF66T6Ve', 'ครูไอที 01', 'evaluatee',
  (SELECT id FROM departments WHERE code='IT'), (SELECT id FROM org_groups WHERE code='ACD')),
-('t.me01@ccollege.ac.th', '$2b$10$gkmAZQmS5GjA3cgHAzZgN.HZzaH4gKeuTkeJnNoAEFT2OyczRibuC', 'ครูเครื่องกล 01', 'evaluatee',
+('t.me01@ccollege.ac.th', '$2a$10$RITdychQz3LxlKF.o5FoCeruIWc0Y6Pr/IVx2d1XdBgw7WF66T6Ve', 'ครูเครื่องกล 01', 'evaluatee',
  (SELECT id FROM departments WHERE code='ME'), (SELECT id FROM org_groups WHERE code='ACD')),
-('t.acc01@ccollege.ac.th', '$2b$10$5FALWHRfgaBZC0Az5BAVdeelVK4LgRGyKOmSC0hNI3yU6.PRbCxnW', 'ครูบัญชี 01', 'evaluatee',
+('t.acc01@ccollege.ac.th', '$2a$10$RITdychQz3LxlKF.o5FoCeruIWc0Y6Pr/IVx2d1XdBgw7WF66T6Ve', 'ครูบัญชี 01', 'evaluatee',
  (SELECT id FROM departments WHERE code='ACC'), (SELECT id FROM org_groups WHERE code='ACD'));
 
 -- Periods
@@ -508,23 +545,6 @@ JOIN users u_evalr ON u_evalr.email='eva.it@ccollege.ac.th'
 JOIN evaluation_topics t ON t.code='TOP1'
 JOIN indicators i ON i.code='T1-MEDIA'
 WHERE p.code='Y2568';
-
--- Example attachments
-INSERT INTO attachments (period_id, evaluatee_id, indicator_id, evidence_type_id, file_name, mime_type, size_bytes, storage_path)
-SELECT (SELECT id FROM evaluation_periods WHERE code='Y2568'),
-       (SELECT id FROM users WHERE email='t.it01@ccollege.ac.th'),
-       (SELECT id FROM indicators WHERE code='T1-PLAN'),
-       (SELECT id FROM evidence_types WHERE code='E-PLAN'),
-       'lesson_plan_it01_2568.pdf','application/pdf',523000,
-       '/var/lib/evaluation/uploads/2568/t.it01/lesson_plan_it01_2568.pdf';
-
-INSERT INTO attachments (period_id, evaluatee_id, indicator_id, evidence_type_id, file_name, mime_type, size_bytes, storage_path)
-SELECT (SELECT id FROM evaluation_periods WHERE code='Y2568'),
-       (SELECT id FROM users WHERE email='t.it01@ccollege.ac.th'),
-       (SELECT id FROM indicators WHERE code='T1-MEDIA'),
-       (SELECT id FROM evidence_types WHERE code='E-MEDIA'),
-       'media_samples_it01.zip','application/zip',2048576,
-       '/var/lib/evaluation/uploads/2568/t.it01/media_samples_it01.zip';
 
 -- View
 CREATE OR REPLACE VIEW v_evidence_progress AS

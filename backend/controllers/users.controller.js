@@ -1,261 +1,128 @@
 // controllers/users.controller.js
-// ---------------------------------------------
-// "ฉบับนักเรียน" : Controller คุย DB โดยตรงผ่าน Knex (ไม่มี repository)
-// จุดประสงค์เพื่อให้เห็นเส้นทางข้อมูลแบบตรงไปตรงมา: HTTP -> Controller -> DB
-// ---------------------------------------------
+// จัดการผู้ใช้ (เฉพาะ admin): ค้นหา/แบ่งหน้า เพิ่ม แก้ไข ลบ รีเซ็ตรหัสผ่าน
+const db = require('../db/knex');
+const bcrypt = require('bcrypt');
+const { ah, httpError, toId } = require('../utils/authz');
 
-const db = require("../db/knex");   // ตัวเชื่อม MySQL ผ่าน Knex (ตั้งค่าใน db/knex.js)
-const bcrypt = require("bcrypt");   // สำหรับแฮช (เข้ารหัสทางเดียว) รหัสผ่าน
+const ROLES = ['admin', 'evaluator', 'evaluatee'];
+const STATUSES = ['active', 'disabled'];
+const SORTABLE = { id: 'u.id', name_th: 'u.name_th', email: 'u.email', role: 'u.role', status: 'u.status', department_name: 'd.name_th', created_at: 'u.created_at' };
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// ฟังก์ชันเล็กๆ ช่วย "เลือกเฉพาะฟิลด์ที่ปลอดภัย" ไม่ส่ง password_hash ออกไป
-// เหตุผล: ห้ามเปิดเผย password_hash ต่อ client เพื่อความปลอดภัย
-const pickPublic = (row) =>
-  row && {
-    id: row.id,
-    name_th: row.name_th,
-    email: row.email,
-    role: row.role,
-    created_at: row.created_at,
-  };
+const baseQuery = () =>
+  db('users as u')
+    .leftJoin('departments as d', 'd.id', 'u.department_id')
+    .leftJoin('org_groups as g', 'g.id', 'u.org_group_id');
+
+const COLUMNS = [
+  'u.id', 'u.email', 'u.name_th', 'u.role', 'u.status', 'u.department_id', 'u.org_group_id',
+  'u.created_at', 'u.updated_at', 'd.name_th as department_name', 'g.name_th as org_group_name',
+];
+
+function applyFilters(q, { search, role, status, department_id }) {
+  if (search) {
+    const s = `%${search}%`;
+    q.where((w) => w.where('u.name_th', 'like', s).orWhere('u.email', 'like', s));
+  }
+  if (role && ROLES.includes(role)) q.where('u.role', role);
+  if (status && STATUSES.includes(status)) q.where('u.status', status);
+  if (toId(department_id)) q.where('u.department_id', toId(department_id));
+  return q;
+}
 
 /**
- * GET /api/users
- * ---------------------------
- * - แสดงรายการผู้ใช้
- * - ถ้าเป็น admin => เห็นทั้งหมด
- * - ถ้าเป็นบทบาทอื่น => เห็นเฉพาะ "ข้อมูลตัวเอง"
- * - ใช้สำหรับอธิบาย RBAC และการดึงข้อมูลแบบปลอดภัย (ไม่ส่ง password_hash)
+ * GET /api/users?page=1&itemsPerPage=10&search=&role=&status=&department_id=&sortBy=id&sortDesc=true
+ * itemsPerPage=-1 คืนทั้งหมด (ใช้ในหน้าจับคู่กรรมการ)
  */
-exports.list = async (req, res, next) => {
-  try {
-    // กรณี admin เห็นทั้งหมด
-    if (req.user?.role === "admin") {
-      const items = await db("users")
-        .select("id", "name_th", "email", "role", "created_at")
-        .orderBy("id", "desc");
-      return res.json({ success: true, items, total: items.length });
-    }
+exports.list = ah(async (req, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const perPage = Number(req.query.itemsPerPage) === -1 ? -1 : Math.min(200, Math.max(1, Number(req.query.itemsPerPage) || 10));
+  const sortCol = SORTABLE[req.query.sortBy] || 'u.id';
+  const sortDir = String(req.query.sortDesc) === 'false' ? 'asc' : 'desc';
 
-    // ไม่ใช่ admin -> ต้องล็อกอิน และเห็นเฉพาะตัวเอง
-    if (!req.user?.id) {
-      return res.status(403).json({ success: false, message: "Forbidden" });
-    }
-    const me = await db("users")
-      .select("id", "name_th", "email", "role", "created_at")
-      .where({ id: req.user.id })
-      .first();
+  const [{ total }] = await applyFilters(baseQuery(), req.query).count({ total: 'u.id' });
+  const q = applyFilters(baseQuery(), req.query).select(COLUMNS).orderBy(sortCol, sortDir);
+  if (perPage !== -1) q.limit(perPage).offset((page - 1) * perPage);
 
-    return res.json({
-      success: true,
-      items: me ? [me] : [],
-      total: me ? 1 : 0,
-    });
-  } catch (e) {
-    next(e); // ส่งต่อให้ error middleware รวมศูนย์การจัดการ error
+  res.json({ success: true, items: await q, total: Number(total), page, itemsPerPage: perPage });
+});
+
+// GET /api/users/:id
+exports.get = ah(async (req, res) => {
+  const row = await baseQuery().select(COLUMNS).where('u.id', toId(req.params.id)).first();
+  if (!row) throw httpError(404, 'ไม่พบผู้ใช้');
+  res.json({ success: true, data: row });
+});
+
+// ตรวจและเตรียมข้อมูลสำหรับบันทึก (isCreate = ต้องมีรหัสผ่าน)
+async function buildPayload(body, isCreate) {
+  const data = {};
+  if (isCreate || body.email !== undefined) {
+    const email = String(body.email || '').trim().toLowerCase();
+    if (!EMAIL_RE.test(email)) throw httpError(422, 'รูปแบบอีเมลไม่ถูกต้อง');
+    data.email = email;
   }
-};
-
-/**
- * GET /api/users/:id
- * ---------------------------
- * - ดึงรายละเอียดผู้ใช้จาก id
- * - ใช้ .first() เพื่อได้เพียงแถวเดียว
- */
-exports.get = async (req, res, next) => {
-  try {
-    const row = await db("users")
-      .select("id", "name_th", "email", "role", "created_at")
-      .where({ id: req.params.id })
-      .first();
-
-    if (!row) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-    res.json({ success: true, data: row });
-  } catch (e) {
-    next(e);
+  if (isCreate || body.name_th !== undefined) {
+    const name = String(body.name_th || '').trim();
+    if (!name) throw httpError(422, 'กรุณากรอกชื่อ-นามสกุล');
+    data.name_th = name;
   }
-};
-
-/**
- * POST /api/users
- * ---------------------------
- * - สร้างผู้ใช้ใหม่
- * - ตรวจค่าบังคับ (name_th, email, password)
- * - ตรวจอีเมลซ้ำ (unique)
- * - แฮชรหัสผ่านเก็บที่คอลัมน์ password_hash (ตามสคีมา)
- * - คืนข้อมูลผู้ใช้ (แบบไม่รวม password_hash)
- */
-exports.create = async (req, res, next) => {
-  try {
-    const { name_th, email, password, role = "evaluatee" } = req.body || {};
-
-    // 1) ตรวจว่ามีฟิลด์จำเป็นไหม
-    if (!name_th || !email || !password) {
-      return res
-        .status(400)
-        .json({ success: false, message: "name_th, email, password required" });
-    }
-
-    // 2) ตรวจอีเมลซ้ำ (ต้อง unique)
-    const exists = await db("users").where({ email }).first();
-    if (exists) {
-      return res
-        .status(409)
-        .json({ success: false, message: "Email already exists" });
-    }
-
-    // 3) แฮชรหัสผ่าน แล้วบันทึกลงคอลัมน์ password_hash (ห้ามเก็บ plaintext)
-    const password_hash = await bcrypt.hash(password, 10);
-
-    // 4) insert และอ่านกลับมาเพื่อส่งให้ client
-    const [insertId] = await db("users").insert({
-      name_th,
-      email,
-      password_hash,
-      role,
-    });
-    const created = await db("users")
-      .select("id", "name_th", "email", "role", "created_at")
-      .where({ id: insertId })
-      .first();
-
-    res.status(201).json({ success: true, data: created });
-  } catch (e) {
-    next(e);
+  if (isCreate || body.role !== undefined) {
+    if (!ROLES.includes(body.role)) throw httpError(422, 'บทบาทไม่ถูกต้อง');
+    data.role = body.role;
   }
-};
-
-/**
- * PUT /api/users/:id
- * ---------------------------
- * - อัปเดตข้อมูลผู้ใช้ตาม id
- * - อนุญาตแก้เฉพาะฟิลด์ที่ส่งมา (partial update)
- * - ถ้าเปลี่ยนอีเมล ต้องตรวจซ้ำ (unique)
- * - ถ้าส่ง password มาใหม่ -> แฮชใหม่และอัปเดต password_hash
- */
-exports.update = async (req, res, next) => {
-  try {
-    const id = req.params.id;
-    if (!id) return res.status(400).json({ success: false, message: "Missing user ID" });
-
-    const { name_th, email, role, password } = req.body || {};
-    const payload = {};
-
-    // 1) เก็บเฉพาะฟิลด์ที่ส่งเข้ามา (ไม่บังคับต้องส่งครบ)
-    if (name_th != null) payload.name_th = name_th;
-    if (email != null) payload.email = email;
-    if (role != null) payload.role = role;
-
-    // 2) ถ้าเปลี่ยนรหัสผ่าน -> แฮชใหม่
-    if (password && password.trim() !== "") {
-      payload.password_hash = await bcrypt.hash(password, 10);
-    }
-
-    // 3) ถ้าจะเปลี่ยนอีเมล -> ตรวจซ้ำกับคนอื่น (ห้ามชนกับผู้ใช้รายอื่น)
-    if (payload.email) {
-      const dup = await db("users")
-        .where({ email: payload.email })
-        .andWhereNot({ id })
-        .first();
-
-      if (dup) {
-        return res.status(409).json({ success: false, message: "Email already exists" });
-      }
-    }
-
-    // 4) update และตรวจว่ามีแถวที่ถูกอัปเดตไหม
-    const affected = await db("users").where({ id }).update(payload);
-    if (!affected) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    // 5) อ่านข้อมูลล่าสุดกลับเพื่อส่งให้ client (ไม่รวม password_hash)
-    const updated = await db("users")
-      .select("id", "name_th", "email", "role", "created_at")
-      .where({ id })
-      .first();
-
-    res.json({ success: true, data: updated });
-  } catch (e) {
-    next(e);
+  if (body.status !== undefined) {
+    if (!STATUSES.includes(body.status)) throw httpError(422, 'สถานะไม่ถูกต้อง');
+    data.status = body.status;
   }
-};
-
-/**
- * DELETE /api/users/:id
- * ---------------------------
- * - ลบผู้ใช้ตาม id
- * - ตัวอย่างนี้จำกัดสิทธิ์เฉพาะ admin (แสดงการใช้ RBAC ชัดเจน)
- */
-exports.remove = async (req, res, next) => {
-  try {
-    // RBAC: admin เท่านั้น
-    if (req.user?.role !== "admin") {
-      return res
-        .status(403)
-        .json({ success: false, message: "Forbidden (admin only)" });
-    }
-
-    const affected = await db("users").where({ id: req.params.id }).del();
-    if (!affected) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    // convention: ลบสำเร็จตอบ success: true พอ ไม่ต้องคืนข้อมูล
-    res.json({ success: true });
-  } catch (e) {
-    next(e);
+  if (body.department_id !== undefined) data.department_id = toId(body.department_id);
+  if (body.org_group_id !== undefined) data.org_group_id = toId(body.org_group_id);
+  if (isCreate || body.password) {
+    if (String(body.password || '').length < 8) throw httpError(422, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
+    data.password_hash = await bcrypt.hash(String(body.password), 10);
   }
-};
+  return data;
+}
 
-/**
- * GET /api/users/server
- * ---------------------------
- * - ตัวอย่าง Server-side Pagination + Search + Sort
- * - page, itemsPerPage, sortBy, sortDesc, search
- * - สอนเรื่อง "การนับ total" และ "LIMIT/OFFSET" บน DB
- */
-exports.listServer = async (req, res, next) => {
-  try {
-    // 1) รับค่า query string พร้อม default
-    const page = Number(req.query.page || 1);
-    const itemsPerPage = Number(req.query.itemsPerPage || 10);
-    const sortBy = String(req.query.sortBy || "id");
-    const sortDesc = req.query.sortDesc === "false" ? false : true;
-    const search = String((req.query.search || "").trim());
+// POST /api/users
+exports.create = ah(async (req, res) => {
+  const data = await buildPayload(req.body || {}, true);
+  if (await db('users').where({ email: data.email }).first()) throw httpError(409, 'อีเมลนี้มีในระบบแล้ว');
+  const [id] = await db('users').insert(data);
+  const row = await baseQuery().select(COLUMNS).where('u.id', id).first();
+  res.status(201).json({ success: true, data: row });
+});
 
-    // 2) whitelist ชื่อคอลัมน์ที่อนุญาตให้ sort (ป้องกัน SQL Injection ทาง orderBy)
-    const allowed = new Set(["id", "name_th", "email", "role", "created_at"]);
-    const column = allowed.has(sortBy) ? sortBy : "id";
-    const dir = sortDesc ? "DESC" : "ASC";
+// PUT /api/users/:id  (ส่ง password มาด้วย = รีเซ็ตรหัสผ่าน)
+exports.update = ah(async (req, res) => {
+  const id = toId(req.params.id);
+  const current = await db('users').where({ id }).first();
+  if (!current) throw httpError(404, 'ไม่พบผู้ใช้');
 
-    // 3) คำนวณ offset และ pattern ค้นหา
-    const off = (page - 1) * itemsPerPage;
-    const like = `%${search}%`;
-
-    // 4) นับจำนวนแถวทั้งหมดที่ตรง search (ใช้ count แยก 1 คำสั่ง)
-    const [{ cnt }] = await db("users")
-      .whereRaw("CONCAT(id,' ',name_th,' ',email,' ',role) LIKE ?", [like])
-      .count({ cnt: "*" });
-
-    // 5) ดึงแถวเฉพาะหน้าที่ต้องการ (LIMIT/OFFSET + ORDER)
-    const items = await db("users")
-      .select("id", "name_th", "email", "role", "created_at")
-      .whereRaw("CONCAT(id,' ',name_th,' ',email,' ',role) LIKE ?", [like])
-      .orderBy(column, dir)
-      .limit(itemsPerPage)
-      .offset(off);
-
-    // 6) ส่งกลับพร้อม total เพื่อให้หน้าเว็บคำนวณจำนวนหน้าได้
-    res.json({
-      success: true,
-      items,
-      total: Number(cnt || 0),
-      page,
-      itemsPerPage,
-    });
-  } catch (e) {
-    next(e);
+  const data = await buildPayload(req.body || {}, false);
+  if (id === req.user.id) {
+    // กันผู้ดูแลระบบล็อกตัวเองออกจากระบบ
+    if (data.role && data.role !== 'admin') throw httpError(422, 'ไม่สามารถเปลี่ยนบทบาทของตัวเองได้');
+    if (data.status === 'disabled') throw httpError(422, 'ไม่สามารถปิดการใช้งานบัญชีของตัวเองได้');
   }
-};
+  if (data.email && data.email !== current.email && (await db('users').where({ email: data.email }).first())) {
+    throw httpError(409, 'อีเมลนี้มีในระบบแล้ว');
+  }
+  if (Object.keys(data).length) await db('users').where({ id }).update(data);
+  const row = await baseQuery().select(COLUMNS).where('u.id', id).first();
+  res.json({ success: true, data: row });
+});
+
+// DELETE /api/users/:id  (ลบได้เฉพาะผู้ใช้ที่ยังไม่มีข้อมูลการประเมิน ไม่งั้นให้ปิดการใช้งานแทน)
+exports.remove = ah(async (req, res) => {
+  const id = toId(req.params.id);
+  if (id === req.user.id) throw httpError(422, 'ไม่สามารถลบบัญชีของตัวเองได้');
+  if (!(await db('users').where({ id }).first())) throw httpError(404, 'ไม่พบผู้ใช้');
+
+  const linked = await db('assignments').where('evaluator_id', id).orWhere('evaluatee_id', id).first()
+    || await db('evaluation_results').where('evaluator_id', id).orWhere('evaluatee_id', id).first();
+  if (linked) throw httpError(409, 'ผู้ใช้นี้มีข้อมูลการประเมินแล้ว ไม่สามารถลบได้ กรุณาใช้ "ปิดการใช้งาน" แทน');
+
+  await db('users').where({ id }).del();
+  res.json({ success: true });
+});

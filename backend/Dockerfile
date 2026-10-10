@@ -1,7 +1,9 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci || npm install
+ENV NODE_ENV=production
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 COPY . .
+RUN mkdir -p uploads
 EXPOSE 7000
-CMD ["npm","start"]
+CMD ["node", "server.js"]

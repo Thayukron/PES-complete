@@ -1,3 +1,10 @@
+# ระบบประเมินบุคลากร (PES) — สำหรับพัฒนา/ซ้อมบนเครื่องตัวเอง
+# เริ่มระบบ:   docker compose up -d --build
+# หน้าเว็บ:     http://localhost:3000
+# API docs:    http://localhost:7000/docs
+# phpMyAdmin:  http://localhost:8082
+# ล้างฐานข้อมูลแล้วเริ่มใหม่ (โหลด schema.sql อีกครั้ง):  docker compose down -v && docker compose up -d --build
+
 services:
   db:
     image: mysql:8.0
@@ -5,56 +12,74 @@ services:
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
       MYSQL_DATABASE: skills_db
       TZ: Asia/Bangkok
-    # ❗แนะนำ “ไม่” เปิด 3306 ออก host กันชนกับ MySQL บนเครื่อง
-    # ถ้าจำเป็นค่อยเปิด:  - "3307:3306"
+    # เปิดให้ HeidiSQL/DBeaver หรือ backend ที่รันนอก docker ต่อได้ (localhost:3308)
+    ports: ["${DB_PORT:-3308}:3306"]
     volumes:
       - db_data:/var/lib/mysql
       - ./schema.sql:/docker-entrypoint-initdb.d/00-schema.sql:ro
     healthcheck:
-      test: ["CMD","mysqladmin","ping","-h","127.0.0.1","-uroot","-prootpassword"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
       timeout: 5s
       retries: 10
-    networks: [dev_net]
+    networks: [pes_net]
+    restart: unless-stopped
 
   phpmyadmin:
-    image: phpmyadmin:latest
+    image: phpmyadmin:5
     environment:
       PMA_HOST: db
-      PMA_USER: root
-      PMA_PASSWORD: rootpassword
-    ports: ["8080:80"]
+      UPLOAD_LIMIT: 64M
+    ports: ["${PMA_PORT:-8082}:80"]
     depends_on: [db]
-    networks: [dev_net]
+    networks: [pes_net]
+    restart: unless-stopped
 
   api:
     build: ./backend
-    env_file:
-      - ./backend/.env
-    ports: ["7000:7000"]
+    # ตั้งค่าได้ที่ไฟล์ .env ข้างไฟล์นี้ (ดู .env.example) — ไม่มีไฟล์ก็รันได้ด้วยค่าเริ่มต้นสำหรับพัฒนา
+    environment:
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      DB_NAME: skills_db
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-before-production}
+      NODE_ENV: production
+    ports: ["${API_PORT:-7000}:7000"]
     depends_on:
       db:
         condition: service_healthy
     volumes:
-      - ./backend/uploads:/app/uploads
-    networks: [dev_net]
+      - uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [pes_net]
+    restart: unless-stopped
 
   frontend:
     build: ./frontend
     environment:
-      NUXT_PUBLIC_API_BASE: http://localhost:7000
-      NITRO_PORT: 3000
+      # หน้าเว็บเรียก /api ที่ตัวเอง แล้ว Nuxt ส่งต่อไปที่ API ภายใน (ไม่ติด CORS ใช้ได้ทุกโดเมน/IP)
+      NUXT_API_INTERNAL: http://api:7000
+      PORT: 3000
       HOST: 0.0.0.0
-    ports: ["3000:3000"]
-    depends_on: [api]
-    networks: [dev_net]
+    ports: ["${WEB_PORT:-3000}:3000"]
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [pes_net]
+    restart: unless-stopped
 
 volumes:
   db_data:
+  uploads:
 
 networks:
-  dev_net:
+  pes_net:
     driver: bridge

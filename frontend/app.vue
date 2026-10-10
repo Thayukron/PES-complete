@@ -1,7 +1,7 @@
-<!-- app.vue (minimum) -->
 <template>
   <NuxtLayout>
     <NuxtPage />
   </NuxtLayout>
+  <AppNotify />
+  <AppConfirm />
 </template>
-

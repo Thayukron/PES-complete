@@ -1,85 +1,85 @@
-<!-- ~/pages/login.vue -->
 <template>
-  <div class="container mx-auto px-4 py-12 max-w-md">
-    <v-card>
-      <v-card-title class="text-xl">เข้าสู่ระบบ</v-card-title>
+  <div class="login-bg d-flex align-center justify-center pa-4">
+    <v-card width="420" class="pa-2" elevation="8">
+      <v-card-item class="text-center pt-6">
+        <v-avatar color="primary" size="64" rounded="lg" class="mb-3">
+          <v-icon icon="mdi-clipboard-check-multiple-outline" size="36" />
+        </v-avatar>
+        <div class="text-h6 font-weight-bold">ระบบประเมินบุคลากร</div>
+        <div class="text-body-2 text-medium-emphasis">Personnel Evaluation System (PES)</div>
+      </v-card-item>
+
       <v-card-text>
-        <form class="flex flex-col gap-4" @submit.prevent="onSubmit">
+        <v-alert v-if="route.query.expired" type="warning" variant="tonal" density="compact" class="mb-4">
+          เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง
+        </v-alert>
+        <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-4">{{ error }}</v-alert>
+
+        <v-form ref="formRef" @submit.prevent="submit">
           <v-text-field
-                v-model="email"
-                label="Email"
-                type="email"
-                :rules="[r => !!r || 'กรอกอีเมล', r => /.+@.+\..+/.test(r) || 'อีเมลไม่ถูกต้อง']"
-                prepend-inner-icon="mdi-email-outline"
-                required
-              />
-              <v-text-field
-                v-model="password"
-                label="Password"
-                :type="showPw ? 'text' : 'password'"
-                :append-inner-icon="show ? 'mdi-eye-off' : 'mdi-eye'"
-                @click:append-inner="showPw = !showPw"
-                prepend-inner-icon="mdi-lock-outline"
-                :rules="[r => !!r || 'กรอกรหัสผ่าน']"
-                required
-              />
-          <div class="d-flex align-center justify-space-between">
-            <v-checkbox v-model="rememberMe" label="Remember me" density="comfortable" hide-details />
-            <NuxtLink to="/forgot" class="text-primary text-caption">Forgot password?</NuxtLink>
-          </div>
-          <v-alert v-if="errorMsg" type="error" density="comfortable" variant="tonal">
-            {{ errorMsg }}
-          </v-alert>
-          <v-card-actions class="px-0">
-            <v-spacer />
-            <v-btn :loading="loading" color="primary" type="submit">Sign in</v-btn>
-          </v-card-actions>
-        </form>
+            v-model="email"
+            label="อีเมล"
+            type="email"
+            prepend-inner-icon="mdi-email-outline"
+            autocomplete="username"
+            :rules="[(v) => !!v || 'กรุณากรอกอีเมล', (v) => /.+@.+\..+/.test(v) || 'รูปแบบอีเมลไม่ถูกต้อง']"
+            class="mb-2"
+          />
+          <v-text-field
+            v-model="password"
+            label="รหัสผ่าน"
+            :type="showPw ? 'text' : 'password'"
+            prepend-inner-icon="mdi-lock-outline"
+            :append-inner-icon="showPw ? 'mdi-eye-off' : 'mdi-eye'"
+            autocomplete="current-password"
+            :rules="[(v) => !!v || 'กรุณากรอกรหัสผ่าน']"
+            @click:append-inner="showPw = !showPw"
+          />
+          <v-btn type="submit" color="primary" size="large" block :loading="loading" class="mt-2">เข้าสู่ระบบ</v-btn>
+        </v-form>
+      </v-card-text>
+      <v-card-text class="text-center text-caption text-medium-emphasis pt-0">
+        ลืมรหัสผ่าน กรุณาติดต่อผู้ดูแลระบบ
       </v-card-text>
     </v-card>
   </div>
 </template>
+
 <script setup>
-definePageMeta({ layout: 'auth-login', ssr: false })// ปิด SSR (ถ้าเปิดจะ error เพราะใช้ localStorage)
-import { ref } from 'vue'
-import { useAuthStore } from '~/stores/auth'
-import { useForm, useField } from 'vee-validate'
-import * as yup from 'yup'
+definePageMeta({ layout: 'blank', public: true })
 
 const { $api } = useNuxtApp()
-const router = useRouter()
 const auth = useAuthStore()
+const route = useRoute()
 
-const errorMsg = ref('')
+const formRef = ref()
+const email = ref('')
+const password = ref('')
 const showPw = ref(false)
-const rememberMe = ref(false)
 const loading = ref(false)
+const error = ref('')
 
-const schema = yup.object({
-  email: yup.string().email('อีเมลไม่ถูกต้อง').required('กรอกอีเมล'),
-  password: yup.string().min(6, 'รหัสผ่านอย่างน้อย 6 ตัว').required('กรอกรหัสผ่าน')
-})
-
-const { handleSubmit } = useForm({ validationSchema: schema })
-const { value: email, errorMessage: emailErr } = useField('email')
-const { value: password, errorMessage: passwordErr } = useField('password')
-
-const onSubmit = handleSubmit(async (values) => {
-  errorMsg.value = ''
+async function submit() {
+  const { valid } = await formRef.value.validate()
+  if (!valid) return
   loading.value = true
+  error.value = ''
   try {
-    const { data } = await $api.post('/api/auth/login', { ...values, remember: rememberMe.value })
-    if (data?.accessToken) {
-      auth.setAuth(data.accessToken, data.user)   // ← เก็บลง localStorage เรียบร้อย
-      await router.push('/')
-    } else {
-      errorMsg.value = 'Invalid response'
-    }
+    const { data } = await $api.post('/api/auth/login', { email: email.value.trim(), password: password.value })
+    auth.setAuth(data.accessToken, data.user)
+    const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/') ? route.query.redirect : '/'
+    await navigateTo(redirect)
   } catch (e) {
-    errorMsg.value = e.response?.data?.message || e.message || 'Login error'
-    console.error('LOGIN ERROR:', e)
+    error.value = errorMessage(e, 'เข้าสู่ระบบไม่สำเร็จ')
   } finally {
     loading.value = false
   }
-})
+}
 </script>
+
+<style scoped>
+.login-bg {
+  min-height: 100vh;
+  background: linear-gradient(135deg, rgb(var(--v-theme-primary)) 0%, #0f172a 100%);
+}
+</style>

@@ -1,0 +1,135 @@
+<!-- รายงานผลการประเมินรายบุคคล (พิมพ์/บันทึกเป็น PDF ได้จากเบราว์เซอร์) -->
+<template>
+  <div>
+    <div class="d-flex flex-wrap align-center ga-2 mb-4 no-print">
+      <v-btn variant="text" prepend-icon="mdi-arrow-left" @click="router.back()">กลับ</v-btn>
+      <v-spacer />
+      <PeriodSelect @change="load" />
+      <v-btn variant="tonal" prepend-icon="mdi-file-delimited-outline" :disabled="!r" @click="exportCsv">ส่งออก CSV</v-btn>
+      <v-btn color="primary" prepend-icon="mdi-printer" :disabled="!r" @click="print">พิมพ์ / บันทึก PDF</v-btn>
+    </div>
+
+    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+
+    <v-card v-if="r" class="report pa-2">
+      <v-card-text>
+        <div class="text-center mb-4">
+          <div class="text-h6 font-weight-bold">แบบรายงานผลการประเมินบุคลากร</div>
+          <div class="text-subtitle-1">{{ r.period.name_th }}</div>
+        </div>
+
+        <v-row dense class="mb-2 text-body-2">
+          <v-col cols="12" sm="6"><strong>ชื่อ-นามสกุล:</strong> {{ r.evaluatee.name_th }}</v-col>
+          <v-col cols="12" sm="6"><strong>อีเมล:</strong> {{ r.evaluatee.email }}</v-col>
+          <v-col cols="12" sm="6"><strong>แผนกวิชา:</strong> {{ r.evaluatee.department_name || '-' }}</v-col>
+          <v-col cols="12" sm="6"><strong>ฝ่าย:</strong> {{ r.evaluatee.org_group_name || '-' }}</v-col>
+          <v-col cols="12" sm="6"><strong>ช่วงเวลา:</strong> {{ thDate(r.period.start_date) }} – {{ thDate(r.period.end_date) }}</v-col>
+          <v-col cols="12" sm="6"><strong>กรรมการ:</strong> {{ r.evaluators.map((e) => `${e.name} (${STATUS[e.status].text})`).join(', ') || '-' }}</v-col>
+        </v-row>
+
+        <v-alert v-if="!r.completed" type="warning" variant="tonal" density="compact" class="mb-3">
+          รายงานนี้ยังไม่สมบูรณ์: กรรมการยังส่งผลไม่ครบทุกท่าน
+        </v-alert>
+
+        <table class="rpt">
+          <thead>
+            <tr>
+              <th style="width: 120px">รหัส</th><th>ตัวชี้วัด</th><th style="width: 70px">หลักฐาน</th>
+              <th style="width: 90px">ตนเอง</th><th style="width: 90px">กรรมการ</th><th style="width: 80px">ร้อยละ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="t in r.topics" :key="t.id">
+              <tr class="topic">
+                <td colspan="5">{{ t.code }} {{ t.title_th }} (น้ำหนัก {{ (t.weight * 100).toFixed(0) }}%)</td>
+                <td class="num">{{ pct(t.percent) }}</td>
+              </tr>
+              <tr v-for="i in t.indicators" :key="i.id">
+                <td class="text-no-wrap">{{ i.code }}</td>
+                <td>
+                  {{ i.name_th }}
+                  <div v-for="e in i.evaluators.filter((x) => x.notes)" :key="e.evaluator_id" class="note">ความเห็น: {{ e.notes }}</div>
+                </td>
+                <td class="num">{{ i.files.length }}</td>
+                <td class="num">{{ valueText(i, i.self) }}</td>
+                <td class="num">{{ valueText(i, i.final) }}</td>
+                <td class="num">{{ pct(i.final?.percent) }}</td>
+              </tr>
+            </template>
+            <tr class="total">
+              <td colspan="3">คะแนนรวม</td>
+              <td class="num">{{ pct(r.self_totals.percent) }}</td>
+              <td colspan="2" class="num">{{ pct(r.totals.percent) }} {{ r.totals.level ? `(${r.totals.level})` : '' }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="mt-4">
+          <div class="font-weight-bold mb-1">ข้อเสนอแนะจากกรรมการ</div>
+          <div v-if="!r.feedback.length" class="text-medium-emphasis">-</div>
+          <div v-for="f in r.feedback" :key="f.evaluator_id" class="mb-2">
+            <div class="text-pre">{{ f.comment }}</div>
+            <div class="text-caption">— {{ f.evaluator_name }}</div>
+          </div>
+        </div>
+
+        <div class="signs mt-10">
+          <div v-for="label in ['ผู้รับการประเมิน', 'กรรมการประเมิน', 'ผู้อำนวยการ']" :key="label" class="sign">
+            <div>ลงชื่อ ......................................................</div>
+            <div>(......................................................)</div>
+            <div>{{ label }}</div>
+          </div>
+        </div>
+        <div class="text-caption text-medium-emphasis mt-6">
+          พิมพ์เมื่อ {{ thDate(new Date().toISOString().slice(0, 16).replace('T', ' '), true) }} · เกณฑ์ระดับ: ≥90 ดีเยี่ยม, ≥80 ดีมาก, ≥70 ดี, ≥60 พอใช้, &lt;60 ต้องปรับปรุง
+        </div>
+      </v-card-text>
+    </v-card>
+  </div>
+</template>
+
+<script setup>
+definePageMeta({ title: 'รายงานผลการประเมิน' })
+
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
+const evaluateeId = computed(() => (route.params.id === 'me' ? auth.user?.id : Number(route.params.id)))
+const { r, loading, load } = useEvaluateeReport(() => evaluateeId.value)
+onMounted(load)
+
+const print = () => window.print()
+
+function exportCsv() {
+  const rows = []
+  for (const t of r.value.topics) {
+    for (const i of t.indicators) {
+      rows.push([t.code, t.title_th, i.code, i.name_th, i.files.length, valueText(i, i.self), valueText(i, i.final), i.final?.percent ?? '',
+        i.evaluators.map((e) => e.notes).filter(Boolean).join(' | ')])
+    }
+  }
+  rows.push(['', '', '', 'คะแนนรวม', '', r.value.self_totals.percent ?? '', '', r.value.totals.percent ?? '', r.value.totals.level ?? ''])
+  downloadCsv(
+    `รายงาน_${r.value.evaluatee.name_th}_${r.value.period.code}.csv`,
+    ['รหัสด้าน', 'ด้าน', 'รหัสตัวชี้วัด', 'ตัวชี้วัด', 'จำนวนหลักฐาน', 'ประเมินตนเอง', 'กรรมการ', 'ร้อยละ', 'ความเห็นกรรมการ'],
+    rows
+  )
+}
+</script>
+
+<style scoped>
+.rpt { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.rpt th, .rpt td { border: 1px solid rgba(var(--v-border-color), 0.4); padding: 6px 8px; vertical-align: top; }
+.rpt th { background: rgba(var(--v-theme-primary), 0.08); text-align: left; }
+.rpt .num { text-align: center; white-space: nowrap; }
+.rpt .topic td { background: rgba(var(--v-theme-on-surface), 0.05); font-weight: 600; }
+.rpt .total td { font-weight: 700; background: rgba(var(--v-theme-primary), 0.08); }
+.note { font-size: 0.8rem; opacity: 0.75; }
+.signs { display: flex; justify-content: space-around; flex-wrap: wrap; gap: 24px; text-align: center; }
+.sign div { margin-bottom: 4px; }
+@media print {
+  .report { border: none !important; }
+  .rpt { font-size: 11pt; }
+  .rpt th, .rpt td { border-color: #555; }
+}
+</style>
