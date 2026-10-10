@@ -4,7 +4,7 @@ const db = require('../db/knex');
 const { ah, httpError, toId, resolvePeriod, assertCanView, isAdmin, isEvaluator, isEvaluatee } = require('../utils/authz');
 const { loadTopics } = require('./topics.controller');
 const { summarize, statusOf } = require('../utils/progress');
-const { computeTotals, averageValues, indicatorPercent } = require('../utils/scoring');
+const { computeTotals, averageValues, indicatorPercent, paResult, PA_PASS_PERCENT } = require('../utils/scoring');
 
 // คู่กรรมการ-ครู ที่ผู้ใช้คนนี้มองเห็น
 function visiblePairs(user, periodId) {
@@ -59,7 +59,7 @@ exports.evaluatee = ah(async (req, res) => {
   const finalValues = {};
 
   const outTopics = topics.map((t) => ({
-    id: t.id, code: t.code, title_th: t.title_th, weight: t.weight,
+    id: t.id, code: t.code, title_th: t.title_th, weight: t.weight, pa_weight: t.pa_weight,
     indicators: t.indicators.map((i) => {
       const evals = submitted.filter((r) => r.indicator_id === i.id);
       const final = averageValues(evals);
@@ -78,10 +78,25 @@ exports.evaluatee = ah(async (req, res) => {
 
   const totals = computeTotals(topics, finalValues);
   const selfTotals = computeTotals(topics, selfByInd);
+  const paTotals = computeTotals(topics, finalValues, 'pa_weight');
+  const paSelf = computeTotals(topics, selfByInd, 'pa_weight');
+  const find = (tt, id) => tt.topics.find((x) => x.id === id) || {};
   for (const t of outTopics) {
-    t.percent = totals.topics.find((x) => x.id === t.id)?.percent ?? null;
-    t.self_percent = selfTotals.topics.find((x) => x.id === t.id)?.percent ?? null;
+    Object.assign(t, {
+      percent: find(totals, t.id).percent ?? null,
+      points: find(totals, t.id).points ?? null,
+      full_points: find(totals, t.id).full_points ?? 0,
+      self_percent: find(selfTotals, t.id).percent ?? null,
+      self_points: find(selfTotals, t.id).points ?? null,
+      pa_points: find(paTotals, t.id).points ?? null,
+      pa_full_points: find(paTotals, t.id).full_points ?? 0,
+      pa_self_points: find(paSelf, t.id).points ?? null,
+    });
   }
+  // เกณฑ์ผ่าน PA คิดจากกรรมการแต่ละคน (ไม่ใช่ค่าเฉลี่ย)
+  const byEvaluator = [...submittedBy].map((eid) =>
+    Object.fromEntries(submitted.filter((r) => r.evaluator_id === eid).map((r) => [r.indicator_id, r])));
+  const pa = paResult(topics, byEvaluator);
 
   res.json({
     success: true,
@@ -91,6 +106,7 @@ exports.evaluatee = ah(async (req, res) => {
       topics: outTopics,
       totals: { percent: totals.percent, level: totals.level, scored: totals.scored, total: totals.total },
       self_totals: { percent: selfTotals.percent, level: selfTotals.level },
+      pa_totals: { percent: paTotals.percent, self_percent: paSelf.percent, pass: pa.pass, min_percent: pa.min_percent, pass_percent: PA_PASS_PERCENT },
       self_status: statusOf(selfRows),
       evaluators: assigned.map((a) => ({
         id: a.evaluator_id,

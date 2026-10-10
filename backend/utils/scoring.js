@@ -32,29 +32,44 @@ function weightedAverage(items) {
 // ระดับผลการประเมินจากคะแนนร้อยละ
 function levelOf(percent) {
   if (percent === null || percent === undefined) return null;
-  if (percent >= 90) return 'ดีเยี่ยม';
+  if (percent >= 90) return 'ดีเด่น';
   if (percent >= 80) return 'ดีมาก';
   if (percent >= 70) return 'ดี';
   if (percent >= 60) return 'พอใช้';
-  return 'ต้องปรับปรุง';
+  return 'ปรับปรุง';
 }
+
+// เกณฑ์ผ่านแบบประเมิน PA: ได้คะแนนจากกรรมการแต่ละคนไม่ต่ำกว่าร้อยละ 70
+const PA_PASS_PERCENT = 70;
 
 /**
  * คำนวณคะแนนรวมจากโครงสร้างด้าน/ตัวชี้วัด
- * @param topics [{ id, weight, indicators: [{ id, type, max_score, weight }] }]
+ * @param topics [{ id, weight, pa_weight, indicators: [{ id, type, max_score, weight }] }]
  * @param valuesByIndicator { [indicator_id]: { score, value_yes_no } }
+ * @param weightKey 'weight' = แบบประเมินผลการปฏิบัติงาน (เลื่อนเงินเดือน), 'pa_weight' = แบบประเมิน PA
+ *
+ * ด้านที่น้ำหนักเป็น 0 ไม่ถูกนับ (เช่น องค์ประกอบที่ 2-3 ไม่อยู่ในแบบ PA)
+ * ถ้าน้ำหนักรวมของทุกด้านเท่ากับ 100% คะแนนร้อยละ = คะแนนเต็ม 100 ตามแบบฟอร์ม
  */
-function computeTotals(topics, valuesByIndicator) {
-  const topicResults = topics.map((t) => {
+function computeTotals(topics, valuesByIndicator, weightKey = 'weight') {
+  const anyWeight = topics.some((t) => Number(t[weightKey] || 0) > 0);
+  const counted = anyWeight ? topics.filter((t) => Number(t[weightKey] || 0) > 0) : topics;
+  const topicResults = counted.map((t) => {
     const indicators = t.indicators.map((i) => ({
       id: i.id,
       weight: i.weight,
       percent: indicatorPercent(i, valuesByIndicator[i.id]),
     }));
+    const percent = weightedAverage(indicators);
+    // ไม่มีด้านใดกำหนดน้ำหนัก -> ถือว่าเท่ากันทุกด้าน
+    const weight = anyWeight ? Number(t[weightKey]) : 1 / counted.length;
     return {
       id: t.id,
-      weight: t.weight,
-      percent: weightedAverage(indicators),
+      weight,
+      percent,
+      // คะแนนที่ได้ / คะแนนเต็มของด้าน (เทียบฐาน 100 ตามน้ำหนัก)
+      points: percent === null ? null : round2(percent * weight),
+      full_points: round2(weight * 100),
       scored: indicators.filter((x) => x.percent !== null).length,
       total: indicators.length,
       indicators,
@@ -70,6 +85,14 @@ function computeTotals(topics, valuesByIndicator) {
   };
 }
 
+// ผลแบบ PA: คะแนนจากกรรมการแต่ละคนต้อง >= 70% จึงผ่าน
+function paResult(topics, valuesByEvaluator) {
+  const list = valuesByEvaluator.map((v) => computeTotals(topics, v, 'pa_weight').percent);
+  if (!list.length || list.some((p) => p === null)) return { pass: null, min_percent: null };
+  const min = Math.min(...list);
+  return { pass: min >= PA_PASS_PERCENT, min_percent: min };
+}
+
 // ค่าเฉลี่ยของกรรมการหลายคนต่อ 1 ตัวชี้วัด (score เฉลี่ย, yes_no ใช้เสียงข้างมาก)
 function averageValues(rows) {
   if (!rows.length) return null;
@@ -81,4 +104,4 @@ function averageValues(rows) {
   };
 }
 
-module.exports = { indicatorPercent, weightedAverage, levelOf, computeTotals, averageValues, round2 };
+module.exports = { indicatorPercent, weightedAverage, levelOf, computeTotals, averageValues, paResult, round2, PA_PASS_PERCENT };

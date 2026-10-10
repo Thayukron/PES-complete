@@ -37,7 +37,7 @@ export const INDICATOR_TYPES = {
 }
 
 export function levelColor(level) {
-  return { 'ดีเยี่ยม': 'success', 'ดีมาก': 'teal', 'ดี': 'info', 'พอใช้': 'warning', 'ต้องปรับปรุง': 'error' }[level] || 'grey'
+  return { 'ดีเด่น': 'success', 'ดีมาก': 'teal', 'ดี': 'info', 'พอใช้': 'warning', 'ปรับปรุง': 'error' }[level] || 'grey'
 }
 
 export const pct = (v) => (v === null || v === undefined ? '-' : `${Number(v).toFixed(2)}%`)

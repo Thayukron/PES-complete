@@ -117,7 +117,8 @@ CREATE TABLE evaluation_topics (
   code VARCHAR(30) NOT NULL UNIQUE,
   title_th VARCHAR(255) NOT NULL,
   description TEXT NULL,
-  weight DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+  weight DECIMAL(5,2) NOT NULL DEFAULT 0.00,      -- น้ำหนักแบบประเมินผลการปฏิบัติงาน (เลื่อนเงินเดือน)
+  pa_weight DECIMAL(5,2) NOT NULL DEFAULT 0.00,   -- น้ำหนักแบบประเมิน PA (0 = ไม่นับใน PA)
   active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -412,139 +413,123 @@ INSERT INTO users (email, password_hash, name_th, role, department_id, org_group
 ('t.acc01@ccollege.ac.th', '$2a$10$RITdychQz3LxlKF.o5FoCeruIWc0Y6Pr/IVx2d1XdBgw7WF66T6Ve', 'ครูบัญชี 01', 'evaluatee',
  (SELECT id FROM departments WHERE code='ACC'), (SELECT id FROM org_groups WHERE code='ACD'));
 
--- Periods
-INSERT INTO evaluation_periods (code, name_th, buddhist_year, start_date, end_date, is_active)
-VALUES ('Y2568','การประเมินครูประจำปี 2568', 2568, '2025-10-01','2026-09-30', 1);
+-- Periods — รอบการประเมินผลการปฏิบัติงาน (เลื่อนเงินเดือน) ปีละ 2 รอบ
+INSERT INTO evaluation_periods (code, name_th, buddhist_year, start_date, end_date, is_active) VALUES
+('R1-2569','การประเมินผลการปฏิบัติงาน ครั้งที่ 1 (1 ต.ค. 2568 – 31 มี.ค. 2569)', 2569, '2025-10-01','2026-03-31', 0),
+('R2-2569','การประเมินผลการปฏิบัติงาน ครั้งที่ 2 (1 เม.ย. – 30 ก.ย. 2569)', 2569, '2026-04-01','2026-09-30', 1);
 
--- Topics
-INSERT INTO evaluation_topics (code, title_th, description, weight) VALUES
-('TOP1','การจัดการเรียนการสอน','คุณภาพการวางแผนการสอน สื่อการสอน การวัดผล และผลสัมฤทธิ์ของผู้เรียน', 0.30),
-('TOP2','การบริหารจัดการชั้นเรียน','การจัดบรรยากาศ กฎระเบียบ การดูแล/ให้คำปรึกษา และกิจกรรมส่งเสริม', 0.20),
-('TOP3','การพัฒนาตนเองและพัฒนาวิชาชีพ','การอบรม/สัมมนา งานวิจัย แผนพัฒนาตนเอง และการประเมินตนเอง', 0.30),
-('TOP4','ด้านอื่นๆ (PA/ผลงาน/จรรยาบรรณ)','ผลงานตามหน้าที่ จรรยาบรรณ และแบบประเมิน PA', 0.20);
+-- =====================================================================
+-- ด้าน/ตัวชี้วัด ตาม "แบบประเมินผลการปฏิบัติงาน ตำแหน่งครู วิทยฐานะครูชำนาญการพิเศษ (ทุกสังกัด)"
+-- และ "แบบประเมินผลการพัฒนางานตามข้อตกลง (PA2/ส)" ซึ่งใช้ตัวชี้วัดชุดเดียวกัน
+--
+--   weight    = น้ำหนักแบบประเมินผลการปฏิบัติงาน (เลื่อนเงินเดือน) รวม 1.00 = 100 คะแนน
+--   pa_weight = น้ำหนักแบบประเมิน PA (PA2/ส)                    รวม 1.00 = 100 คะแนน
+--
+--   ด้าน                          ตัวชี้วัด  เงินเดือน      PA
+--   TOP1 ด้านการจัดการเรียนรู้          8      32  ┐         32  ┐
+--   TOP2 ด้านการส่งเสริมฯ              4      16  ├ 60      16  ├ 60  (ส่วนที่ 1 / องค์ฯ 1 ตอน 1: 15 ตัวชี้วัด x 4)
+--   TOP3 ด้านการพัฒนาตนเองฯ           3      12  ┘         12  ┘
+--   TOP4 ประเด็นท้าทาย                3      20            40      (ส่วนที่ 2 / องค์ฯ 1 ตอน 2)
+--   TOP5 การมีส่วนร่วมฯ (องค์ฯ 2)       1      10             -
+--   TOP6 วินัย คุณธรรมฯ (องค์ฯ 3)      10      10             -
+-- =====================================================================
+INSERT INTO evaluation_topics (code, title_th, description, weight, pa_weight) VALUES
+('TOP1','ด้านการจัดการเรียนรู้','องค์ประกอบที่ 1 ตอนที่ 1 / PA ส่วนที่ 1 — 8 ตัวชี้วัด ระดับ 1-4 (32 คะแนน)', 0.32, 0.32),
+('TOP2','ด้านการส่งเสริมและสนับสนุนการจัดการเรียนรู้','องค์ประกอบที่ 1 ตอนที่ 1 / PA ส่วนที่ 1 — 4 ตัวชี้วัด ระดับ 1-4 (16 คะแนน)', 0.16, 0.16),
+('TOP3','ด้านการพัฒนาตนเองและวิชาชีพ','องค์ประกอบที่ 1 ตอนที่ 1 / PA ส่วนที่ 1 — 3 ตัวชี้วัด ระดับ 1-4 (12 คะแนน)', 0.12, 0.12),
+('TOP4','ประเด็นท้าทายในการพัฒนาผลลัพธ์การเรียนรู้ของผู้เรียน','องค์ประกอบที่ 1 ตอนที่ 2 (20 คะแนน) / PA ส่วนที่ 2 (40 คะแนน) — วิธีดำเนินการ 20 + เชิงปริมาณ 10 + เชิงคุณภาพ 10', 0.20, 0.40),
+('TOP5','การมีส่วนร่วมในการพัฒนาการศึกษา','องค์ประกอบที่ 2 (10 คะแนน) — ระดับ 1-5 x น้ำหนัก 2 ตามร้อยละของงานที่ได้รับมอบหมายแล้วเสร็จ', 0.10, 0.00),
+('TOP6','การปฏิบัติตนในการรักษาวินัย คุณธรรม จริยธรรม และจรรยาบรรณวิชาชีพ','องค์ประกอบที่ 3 (10 คะแนน) — 10 รายการ ระดับ 1-4 (คะแนนรวม ÷ 4)', 0.10, 0.00);
 
--- Indicators
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T1-PLAN','แผนการจัดการเรียนรู้','แผนการสอนสอดคล้องมาตรฐานและตัวชี้วัด','score_1_4',1.00
-FROM evaluation_topics WHERE code='TOP1';
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T1-MEDIA','สื่อการเรียนรู้','ใบงาน/แบบฝึก/มัลติมีเดียเหมาะสมกับผู้เรียน','score_1_4',1.00
-FROM evaluation_topics WHERE code='TOP1';
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T1-ASSESS','หลักฐานการวัดและประเมินผล','ข้อสอบ/รูบริก/ชิ้นงาน/บันทึกคะแนน','score_1_4',1.00
-FROM evaluation_topics WHERE code='TOP1';
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T1-REFLECT','บันทึกหลังการสอน','สะท้อนผลและการปรับปรุงแผนการสอน','yes_no',1.00
-FROM evaluation_topics WHERE code='TOP1';
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T1-STUWORK','ผลงานนักเรียน','ชิ้นงานแสดงความรู้/ทักษะ/คุณลักษณะ','score_1_4',1.00
-FROM evaluation_topics WHERE code='TOP1';
+-- ระดับ 1-4: 1 = ต่ำกว่าระดับที่คาดหวังมาก, 2 = ต่ำกว่าระดับที่คาดหวัง, 3 = ตามระดับที่คาดหวัง, 4 = สูงกว่าระดับที่คาดหวัง
+INSERT INTO indicators (topic_id, code, name_th, description, type, weight, min_score, max_score)
+SELECT t.id, x.code, x.name_th, x.description, 'score_1_4', x.weight, 1, x.max_score
+FROM evaluation_topics t
+JOIN (
+  SELECT 'TOP1' topic, '1.1' code, 'สร้างและหรือพัฒนาหลักสูตร' name_th, 'ริเริ่ม พัฒนารายวิชาและหน่วยการเรียนรู้ให้สอดคล้องกับมาตรฐานการเรียนรู้ และตัวชี้วัด หรือผลการเรียนรู้ ตามหลักสูตร บริบทของสถานศึกษา ผู้เรียน และท้องถิ่น สามารถแก้ไขปัญหาในการจัดการเรียนรู้ เพื่อให้ผู้เรียนได้พัฒนาสมรรถนะและการเรียนรู้เต็มตามศักยภาพ ส่งผลให้คุณภาพการจัดการเรียนรู้สูงขึ้น และเป็นแบบอย่างที่ดีในการสร้างและหรือพัฒนาหลักสูตร' description, 1.00 weight, 4 max_score, 1 ord
+  UNION ALL SELECT 'TOP1','1.2','ออกแบบการจัดการเรียนรู้','ริเริ่ม คิดค้น การออกแบบการจัดการเรียนรู้ โดยเน้นผู้เรียนเป็นสำคัญ สามารถแก้ไขปัญหาและพัฒนาคุณภาพการจัดการเรียนรู้ให้สูงขึ้น เพื่อให้ผู้เรียนมีความรู้ ทักษะ คุณลักษณะประจำวิชา คุณลักษณะอันพึงประสงค์ และสมรรถนะที่สำคัญตามหลักสูตร มีกระบวนการคิดและค้นพบองค์ความรู้ด้วยตนเอง และสร้างแรงบันดาลใจ และเป็นแบบอย่างที่ดีในการออกแบบการจัดการเรียนรู้',1.00,4,2
+  UNION ALL SELECT 'TOP1','1.3','จัดกิจกรรมการเรียนรู้','มีการริเริ่ม คิดค้น และพัฒนานวัตกรรมการจัดกิจกรรมการเรียนรู้ ที่สามารถแก้ไขปัญหาในการจัดการเรียนรู้ ทำให้ผู้เรียนได้พัฒนาเต็มตามศักยภาพ เรียนรู้และทำงานร่วมกัน มีกระบวนการคิดและค้นพบองค์ความรู้ด้วยตนเอง และสร้างแรงบันดาลใจและเป็นแบบอย่างที่ดีในการจัดกิจกรรมการเรียนรู้',1.00,4,3
+  UNION ALL SELECT 'TOP1','1.4','สร้างและหรือพัฒนาสื่อ นวัตกรรม เทคโนโลยี และแหล่งเรียนรู้','มีการริเริ่ม คิดค้น และพัฒนาสื่อ นวัตกรรม เทคโนโลยี และแหล่งเรียนรู้สอดคล้องกับกิจกรรมการเรียนรู้ สามารถแก้ไขปัญหาในการเรียนรู้ของผู้เรียน และทำให้ผู้เรียนมีทักษะการคิด และสามารถสร้างนวัตกรรมได้ และเป็นแบบอย่างที่ดีในการสร้างและหรือพัฒนาสื่อ นวัตกรรม เทคโนโลยี และแหล่งเรียนรู้',1.00,4,4
+  UNION ALL SELECT 'TOP1','1.5','วัดและประเมินผลการเรียนรู้','มีการริเริ่ม คิดค้น และพัฒนารูปแบบการวัดและประเมินผลการเรียนรู้ตามสภาพจริง ด้วยวิธีการที่หลากหลาย เหมาะสม และสอดคล้องกับมาตรฐานการเรียนรู้ และนำผลการวัดและประเมินผลการเรียนรู้มาใช้แก้ไขปัญหาการจัดการเรียนรู้ เพื่อให้ผู้เรียนพัฒนาการเรียนรู้อย่างต่อเนื่อง และเป็นแบบอย่างที่ดีในการวัดและประเมินผลการเรียนรู้',1.00,4,5
+  UNION ALL SELECT 'TOP1','1.6','ศึกษา วิเคราะห์ และสังเคราะห์ เพื่อแก้ไขปัญหาหรือพัฒนาการเรียนรู้','มีการริเริ่ม คิดค้น วิเคราะห์ และสังเคราะห์ เพื่อแก้ไขปัญหาหรือพัฒนาการเรียนรู้ที่ส่งผลต่อคุณภาพผู้เรียน และนำผลการศึกษา วิเคราะห์ และสังเคราะห์ มาใช้แก้ไขปัญหาหรือพัฒนาคุณภาพการจัดการเรียนรู้ให้สูงขึ้น และเป็นแบบอย่างที่ดีในการศึกษา วิเคราะห์ และสังเคราะห์ เพื่อแก้ไขปัญหาหรือพัฒนาการเรียนรู้',1.00,4,6
+  UNION ALL SELECT 'TOP1','1.7','จัดบรรยากาศที่ส่งเสริมและพัฒนาผู้เรียน','มีการริเริ่ม คิดค้น และพัฒนาการจัดบรรยากาศที่เหมาะสม สอดคล้องกับความแตกต่างผู้เรียนเป็นรายบุคคล สามารถแก้ไขปัญหาการเรียนรู้ และสร้างแรงบันดาลใจ ส่งเสริมและพัฒนาผู้เรียนให้เกิดกระบวนการคิด ทักษะชีวิต ทักษะการทำงาน ทักษะการเรียนรู้และนวัตกรรม ทักษะด้านสารสนเทศ สื่อ และเทคโนโลยี และเป็นแบบอย่างที่ดีในการจัดบรรยากาศที่ส่งเสริมและพัฒนาผู้เรียน',1.00,4,7
+  UNION ALL SELECT 'TOP1','1.8','อบรมและพัฒนาคุณลักษณะที่ดีของผู้เรียน','มีการอบรมบ่มนิสัยให้ผู้เรียนมีคุณธรรม จริยธรรม คุณลักษณะอันพึงประสงค์ และค่านิยมความเป็นไทยที่ดีงาม โดยริเริ่ม คิดค้น และพัฒนารูปแบบการดำเนินการที่มีประสิทธิภาพ คำนึงถึงความแตกต่างของผู้เรียนเป็นรายบุคคล และสามารถแก้ไขปัญหาและพัฒนาผู้เรียนได้ และเป็นแบบอย่างที่ดีในการอบรมและพัฒนาคุณลักษณะที่ดีของผู้เรียน',1.00,4,8
 
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T2-CHART','แผนภูมิ/ตาราง','แผนผังที่นั่ง กฎห้องเรียน ตารางเวร','yes_no',1.00
-FROM evaluation_topics WHERE code='TOP2';
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T2-HOMEVISIT','บันทึกการเยี่ยมบ้าน','ร่วมมือผู้ปกครอง/ประสานเครือข่าย','yes_no',1.00
-FROM evaluation_topics WHERE code='TOP2';
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T2-COUNSEL','บันทึกการให้คำปรึกษา','ช่วยเหลือนักเรียนเป็นรายบุคคล/กลุ่ม','yes_no',1.00
-FROM evaluation_topics WHERE code='TOP2';
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T2-ACT','โครงการ/กิจกรรม','กิจกรรมส่งเสริมการเรียนรู้และคุณลักษณะ','score_1_4',1.00
-FROM evaluation_topics WHERE code='TOP2';
+  UNION ALL SELECT 'TOP2','2.1','จัดทำข้อมูลสารสนเทศของผู้เรียนและรายวิชา','มีการริเริ่ม คิดค้น และพัฒนารูปแบบการจัดทำข้อมูลสารสนเทศของผู้เรียนและรายวิชา ให้มีข้อมูลเป็นปัจจุบัน เพื่อใช้ในการส่งเสริมสนับสนุนการเรียนรู้ แก้ไขปัญหาและพัฒนาคุณภาพผู้เรียน และเป็นแบบอย่างที่ดี',1.00,4,9
+  UNION ALL SELECT 'TOP2','2.2','ดำเนินการตามระบบดูแลช่วยเหลือผู้เรียน','มีการใช้ข้อมูลสารสนเทศเกี่ยวกับผู้เรียนรายบุคคล และประสานความร่วมมือกับผู้มีส่วนเกี่ยวข้อง เพื่อพัฒนาและแก้ไขปัญหาผู้เรียน และริเริ่มโครงการหรือจัดกิจกรรมเชิงสร้างสรรค์ด้วยวิธีการที่หลากหลายในการดูแลช่วยเหลือผู้เรียน และเป็นแบบอย่างที่ดี',1.00,4,10
+  UNION ALL SELECT 'TOP2','2.3','ปฏิบัติงานวิชาการ และงานอื่น ๆ ของสถานศึกษา','ร่วมปฏิบัติงานทางวิชาการ และงานอื่น ๆ ของสถานศึกษา เพื่อยกระดับคุณภาพการจัดการศึกษาของสถานศึกษา โดยมีการพัฒนารูปแบบหรือแนวทางการดำเนินงานให้มีประสิทธิภาพสูงขึ้น และเป็นแบบอย่างที่ดี',1.00,4,11
+  UNION ALL SELECT 'TOP2','2.4','ประสานความร่วมมือกับผู้ปกครอง ภาคีเครือข่าย และหรือสถานประกอบการ','การประสานความร่วมมือกับผู้ปกครอง ภาคีเครือข่าย และหรือสถานประกอบการ เพื่อร่วมกันแก้ไขปัญหาและพัฒนาผู้เรียน และเป็นแบบอย่างที่ดี',1.00,4,12
 
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T3-CERT','เกียรติบัตร/วุฒิบัตร','การอบรม/สัมมนา/ศึกษาดูงาน','yes_no',1.00
-FROM evaluation_topics WHERE code='TOP3';
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T3-RESEARCH','เอกสาร/งานวิจัย','วิจัยในชั้นเรียน/ตีพิมพ์/นำเสนอวิชาการ','score_1_4',1.00
-FROM evaluation_topics WHERE code='TOP3';
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T3-IDP','แผนพัฒนาตนเอง','เป้าหมาย/แนวทางพัฒนาตามสายงาน','yes_no',1.00
-FROM evaluation_topics WHERE code='TOP3';
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T3-SELFASSESS','ผลการประเมินตนเอง','แบบประเมินตนเองตามแบบของสถานศึกษา','yes_no',1.00
-FROM evaluation_topics WHERE code='TOP3';
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T3-SCHOOLPART','มีส่วนร่วมกิจกรรมโรงเรียน','เข้าร่วมประชุม/กิจกรรมวันสำคัญ/โครงการ','score_1_4',1.00
-FROM evaluation_topics WHERE code='TOP3';
+  UNION ALL SELECT 'TOP3','3.1','พัฒนาตนเองอย่างเป็นระบบและต่อเนื่อง','พัฒนาตนเองอย่างเป็นระบบและต่อเนื่อง เพื่อให้มีความรู้ ความสามารถ ทักษะ โดยเฉพาะอย่างยิ่งการใช้ภาษาไทยและภาษาอังกฤษเพื่อการสื่อสาร และการใช้เทคโนโลยีดิจิทัลเพื่อการศึกษา สมรรถนะวิชาชีพครูและความรอบรู้ในเนื้อหาวิชาและวิธีการสอน และเป็นแบบอย่างที่ดี',1.00,4,13
+  UNION ALL SELECT 'TOP3','3.2','มีส่วนร่วมและเป็นผู้นำในการแลกเปลี่ยนเรียนรู้ทางวิชาชีพ','มีส่วนร่วม และเป็นผู้นำในการแลกเปลี่ยนเรียนรู้ทางวิชาชีพ เพื่อแก้ไขปัญหาและสร้างนวัตกรรมเพื่อพัฒนาการจัดการเรียนรู้ และเป็นแบบอย่างที่ดี',1.00,4,14
+  UNION ALL SELECT 'TOP3','3.3','นำความรู้ ความสามารถ ทักษะที่ได้จากการพัฒนาตนเองและวิชาชีพมาใช้','นำความรู้ ความสามารถ ทักษะที่ได้จากการพัฒนาตนเองและวิชาชีพมาใช้ในการพัฒนาการจัดการเรียนรู้ การพัฒนาคุณภาพผู้เรียน รวมถึงการพัฒนานวัตกรรมการจัดการเรียนรู้ที่มีผลต่อคุณภาพผู้เรียน และเป็นแบบอย่างที่ดี',1.00,4,15
 
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T4-PA','แบบประเมิน PA','แบบข้อตกลงในการพัฒนางาน (PA)','yes_no',1.00
-FROM evaluation_topics WHERE code='TOP4';
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T4-WORK','ผลงานที่เกิดจากหน้าที่','ผลงานตามภาระงานที่ได้รับมอบหมาย','score_1_4',1.00
-FROM evaluation_topics WHERE code='TOP4';
-INSERT INTO indicators (topic_id, code, name_th, description, type, weight)
-SELECT id,'T4-ETHICS','จรรยาบรรณวิชาชีพ','หลักฐานการปฏิบัติตามจรรยาบรรณครู','yes_no',1.00
-FROM evaluation_topics WHERE code='TOP4';
+  UNION ALL SELECT 'TOP4','CH-1','วิธีดำเนินการ (20 คะแนน)','พิจารณาจากการดำเนินการที่ถูกต้อง ครบถ้วน เป็นไปตามระยะเวลาที่กำหนดไว้ในข้อตกลง และสะท้อนให้เห็นถึงระดับการปฏิบัติที่คาดหวังตามตำแหน่งและวิทยฐานะ',2.00,4,16
+  UNION ALL SELECT 'TOP4','CH-2.1','ผลลัพธ์การเรียนรู้ของผู้เรียน: เชิงปริมาณ (10 คะแนน)','พิจารณาจากการบรรลุเป้าหมายเชิงปริมาณได้ครบถ้วนตามข้อตกลง และมีความถูกต้อง เชื่อถือได้',1.00,4,17
+  UNION ALL SELECT 'TOP4','CH-2.2','ผลลัพธ์การเรียนรู้ของผู้เรียน: เชิงคุณภาพ (10 คะแนน)','พิจารณาจากการบรรลุเป้าหมายเชิงคุณภาพได้ครบถ้วน ถูกต้อง เชื่อถือได้ และปรากฏผลต่อคุณภาพผู้เรียนได้ตามข้อตกลง',1.00,4,18
 
--- Evidence types
+  UNION ALL SELECT 'TOP5','P-1','ความสำเร็จของงานที่ได้รับมอบหมายจากผู้บังคับบัญชา','ระดับ 1 = แล้วเสร็จต่ำกว่าร้อยละ 20, ระดับ 2 = ร้อยละ 20.00-39.99, ระดับ 3 = ร้อยละ 40.00-59.99, ระดับ 4 = ร้อยละ 60.00-79.99, ระดับ 5 = ร้อยละ 80 ขึ้นไป (คะแนน = ระดับ x 2)',1.00,5,19
+
+  UNION ALL SELECT 'TOP6','ETH-01','ยึดมั่นในสถาบันหลักของประเทศ','ยึดมั่นในสถาบันหลักของประเทศ อันได้แก่ ชาติ ศาสนา พระมหากษัตริย์ และการปกครองระบอบประชาธิปไตยอันมีพระมหากษัตริย์ทรงเป็นประมุข',1.00,4,20
+  UNION ALL SELECT 'TOP6','ETH-02','มีความซื่อสัตย์ สุจริต มีจิตสำนึกที่ดี','มีความซื่อสัตย์ สุจริต มีจิตสำนึกที่ดี มีความรับผิดชอบต่อหน้าที่และต่อผู้เกี่ยวข้องในฐานะข้าราชการครูและบุคลากรทางการศึกษา',1.00,4,21
+  UNION ALL SELECT 'TOP6','ETH-03','มีความกล้าคิด กล้าตัดสินใจ กล้าแสดงออก','มีความกล้าคิด กล้าตัดสินใจ กล้าแสดงออก และกระทำในสิ่งที่ถูกต้อง ชอบธรรม',1.00,4,22
+  UNION ALL SELECT 'TOP6','ETH-04','มีจิตอาสา จิตสาธารณะ','มีจิตอาสา จิตสาธารณะ มุ่งประโยชน์ส่วนรวม โดยไม่คำนึงถึงประโยชน์ส่วนตนหรือพวกพ้อง',1.00,4,23
+  UNION ALL SELECT 'TOP6','ETH-05','มุ่งผลสัมฤทธิ์ของงาน','มุ่งผลสัมฤทธิ์ของงาน มุ่งมั่นในการปฏิบัติงานอย่างเต็มกำลังความสามารถ โดยคำนึงถึงคุณภาพการศึกษาเป็นสำคัญ',1.00,4,24
+  UNION ALL SELECT 'TOP6','ETH-06','ปฏิบัติหน้าที่อย่างเป็นธรรมและไม่เลือกปฏิบัติ','ปฏิบัติหน้าที่อย่างเป็นธรรมและไม่เลือกปฏิบัติ',1.00,4,25
+  UNION ALL SELECT 'TOP6','ETH-07','ดำรงตนเป็นแบบอย่างที่ดี','ดำรงตนเป็นแบบอย่างที่ดีและรักษาภาพลักษณ์ของข้าราชการครูและบุคลากรทางการศึกษา',1.00,4,26
+  UNION ALL SELECT 'TOP6','ETH-08','เคารพศักดิ์ศรีความเป็นมนุษย์','เคารพศักดิ์ศรีความเป็นมนุษย์ คำนึงถึงสิทธิเด็ก และยอมรับความแตกต่างของบุคคล',1.00,4,27
+  UNION ALL SELECT 'TOP6','ETH-09','ยึดถือและปฏิบัติตามจรรยาบรรณของวิชาชีพ','ยึดถือและปฏิบัติตามจรรยาบรรณของวิชาชีพ',1.00,4,28
+  UNION ALL SELECT 'TOP6','ETH-10','มีวินัยและการรักษาวินัย','มีวินัยและการรักษาวินัย',1.00,4,29
+) x ON x.topic = t.code
+ORDER BY x.ord;
+
+-- Evidence types (ชนิดหลักฐาน)
 INSERT INTO evidence_types (code, name_th, description) VALUES
-('E-PLAN','แผนการจัดการเรียนรู้','แผนการสอนตามมาตรฐาน/ตัวชี้วัด'),
-('E-MEDIA','สื่อการเรียนรู้','ใบงาน/แบบฝึก/มัลติมีเดีย'),
-('E-ASSESS','หลักฐานการวัดและประเมินผล','ข้อสอบ/รูบริก/บันทึกคะแนน'),
-('E-REFLECT','บันทึกหลังการสอน','สรุปผล-ข้อเสนอแนะ-ปรับปรุง'),
-('E-STUWORK','ผลงานนักเรียน','ชิ้นงาน/แฟ้มสะสมผลงาน'),
-('E-CHART','แผนภูมิ/กฎ/ตารางเวร','เอกสารการจัดชั้นเรียน'),
-('E-HOMEVISIT','บันทึกการเยี่ยมบ้าน','หลักฐานการเยี่ยมบ้าน/ประสานผู้ปกครอง'),
-('E-COUNSEL','บันทึกการให้คำปรึกษา','แบบบันทึก/รายงานกรณี'),
-('E-ACT','โครงการ/กิจกรรม','เอกสาร/ภาพกิจกรรม/รายงานผล'),
-('E-CERT','เกียรติบัตร/วุฒิบัตร','เอกสารการอบรม/สัมมนา'),
-('E-RESEARCH','งานวิจัย/บทความ','เอกสารวิชาการ/นำเสนอผลงาน'),
-('E-IDP','แผนพัฒนาตนเอง','เอกสารเป้าหมาย/แผนพัฒนา'),
-('E-SELFASSESS','ผลการประเมินตนเอง','แบบฟอร์มประเมินตนเอง'),
-('E-PA','แบบประเมิน PA','เอกสารข้อตกลงฯ'),
-('E-WORK','ผลงานตามหน้าที่','หลักฐานผลงาน/รายงาน'),
-('E-ETHICS','จรรยาบรรณวิชาชีพ','หลักฐานการปฏิบัติตามจรรยาบรรณ');
+('E-CURR','หลักสูตร/รายวิชา/หน่วยการเรียนรู้','โครงสร้างรายวิชา หน่วยการเรียนรู้ การปรับปรุงหลักสูตร'),
+('E-PLAN','แผนการจัดการเรียนรู้','แผนการสอน/แผนการจัดการเรียนรู้ที่เน้นผู้เรียนเป็นสำคัญ'),
+('E-ACT','บันทึกหลังสอน/ภาพกิจกรรมการเรียนรู้','บันทึกหลังการสอน ภาพ/คลิปกิจกรรม ผลงานผู้เรียน'),
+('E-MEDIA','สื่อ นวัตกรรม เทคโนโลยี','สื่อการสอน นวัตกรรม แหล่งเรียนรู้ และผลการใช้'),
+('E-ASSESS','เครื่องมือและผลการวัดประเมินผล','ข้อสอบ รูบริก แบบประเมินตามสภาพจริง บันทึกคะแนน'),
+('E-RESEARCH','วิจัยในชั้นเรียน/รายงานการศึกษา','รายงานการศึกษา วิเคราะห์ สังเคราะห์ วิจัยในชั้นเรียน'),
+('E-CLASS','การจัดบรรยากาศชั้นเรียน','ภาพห้องเรียน ป้ายนิเทศ ข้อตกลงชั้นเรียน'),
+('E-MORAL','การพัฒนาคุณลักษณะผู้เรียน','กิจกรรมโฮมรูม อบรมคุณธรรม บันทึกพฤติกรรม'),
+('E-INFO','ข้อมูลสารสนเทศผู้เรียน/รายวิชา','ฐานข้อมูลผู้เรียน สถิติผลการเรียน ระบบสารสนเทศ'),
+('E-CARE','ระบบดูแลช่วยเหลือผู้เรียน','บันทึกเยี่ยมบ้าน SDQ บันทึกการให้คำปรึกษา โครงการช่วยเหลือ'),
+('E-ORDER','คำสั่ง/หลักฐานการปฏิบัติงานของสถานศึกษา','คำสั่งแต่งตั้ง รายงานผลการปฏิบัติงานวิชาการ/งานอื่น'),
+('E-NETWORK','ความร่วมมือผู้ปกครอง/ภาคีเครือข่าย/สถานประกอบการ','บันทึกการประชุม MOU ทวิภาคี ภาพกิจกรรม'),
+('E-CERT','เกียรติบัตร/วุฒิบัตรการพัฒนาตนเอง','เกียรติบัตรการอบรม สัมมนา ศึกษาดูงาน ผลการทดสอบภาษา/ดิจิทัล'),
+('E-PLC','บันทึกการแลกเปลี่ยนเรียนรู้ (PLC)','บันทึก PLC ชุมชนการเรียนรู้ทางวิชาชีพ'),
+('E-APPLY','รายงานการนำความรู้ไปใช้','รายงานการนำผลการพัฒนาตนเองไปใช้ในการจัดการเรียนรู้'),
+('E-PA','ข้อตกลงและรายงานผล PA','แบบข้อตกลง PA (PA1) และรายงานผลการดำเนินงานประเด็นท้าทาย'),
+('E-RESULT','ผลลัพธ์การเรียนรู้ของผู้เรียน','สถิติ/ผลสัมฤทธิ์ ผลงานผู้เรียนตามเป้าหมายเชิงปริมาณและคุณภาพ'),
+('E-WORK','รายงานผลงานที่ได้รับมอบหมาย','สรุปงานที่ได้รับมอบหมายและร้อยละที่แล้วเสร็จ'),
+('E-ETHICS','หลักฐานการปฏิบัติตนตามวินัย/จรรยาบรรณ','บันทึกการปฏิบัติตน เกียรติบัตร จิตอาสา (ถ้ามี)');
 
 -- Indicator ↔ Evidence mapping
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T1-PLAN'), (SELECT id FROM evidence_types WHERE code='E-PLAN');
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T1-MEDIA'), (SELECT id FROM evidence_types WHERE code='E-MEDIA');
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T1-ASSESS'), (SELECT id FROM evidence_types WHERE code='E-ASSESS');
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T1-REFLECT'), (SELECT id FROM evidence_types WHERE code='E-REFLECT');
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T1-STUWORK'), (SELECT id FROM evidence_types WHERE code='E-STUWORK');
-
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T2-CHART'), (SELECT id FROM evidence_types WHERE code='E-CHART');
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T2-HOMEVISIT'), (SELECT id FROM evidence_types WHERE code='E-HOMEVISIT');
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T2-COUNSEL'), (SELECT id FROM evidence_types WHERE code='E-COUNSEL');
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T2-ACT'), (SELECT id FROM evidence_types WHERE code='E-ACT');
-
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T3-CERT'), (SELECT id FROM evidence_types WHERE code='E-CERT');
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T3-RESEARCH'), (SELECT id FROM evidence_types WHERE code='E-RESEARCH');
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T3-IDP'), (SELECT id FROM evidence_types WHERE code='E-IDP');
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T3-SELFASSESS'), (SELECT id FROM evidence_types WHERE code='E-SELFASSESS');
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T3-SCHOOLPART'), (SELECT id FROM evidence_types WHERE code='E-ACT');
-
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T4-PA'), (SELECT id FROM evidence_types WHERE code='E-PA');
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T4-WORK'), (SELECT id FROM evidence_types WHERE code='E-WORK');
-INSERT INTO indicator_evidence SELECT (SELECT id FROM indicators WHERE code='T4-ETHICS'), (SELECT id FROM evidence_types WHERE code='E-ETHICS');
+INSERT INTO indicator_evidence (indicator_id, evidence_type_id)
+SELECT i.id, e.id FROM indicators i JOIN evidence_types e ON (i.code, e.code) IN (
+  ('1.1','E-CURR'), ('1.2','E-PLAN'), ('1.3','E-PLAN'), ('1.3','E-ACT'), ('1.4','E-MEDIA'),
+  ('1.5','E-ASSESS'), ('1.6','E-RESEARCH'), ('1.7','E-CLASS'), ('1.8','E-MORAL'),
+  ('2.1','E-INFO'), ('2.2','E-CARE'), ('2.3','E-ORDER'), ('2.4','E-NETWORK'),
+  ('3.1','E-CERT'), ('3.2','E-PLC'), ('3.3','E-APPLY'),
+  ('CH-1','E-PA'), ('CH-2.1','E-PA'), ('CH-2.1','E-RESULT'), ('CH-2.2','E-PA'), ('CH-2.2','E-RESULT'),
+  ('P-1','E-WORK'), ('P-1','E-ORDER')
+);
+INSERT INTO indicator_evidence (indicator_id, evidence_type_id)
+SELECT i.id, e.id FROM indicators i JOIN evidence_types e ON e.code = 'E-ETHICS' WHERE i.code LIKE 'ETH-%';
 
 -- Assignments
 INSERT INTO assignments (period_id, evaluator_id, evaluatee_id, dept_id)
-VALUES
-((SELECT id FROM evaluation_periods WHERE code='Y2568'),
- (SELECT id FROM users WHERE email='eva.it@ccollege.ac.th'),
- (SELECT id FROM users WHERE email='t.it01@ccollege.ac.th'),
- (SELECT id FROM departments WHERE code='IT')),
-((SELECT id FROM evaluation_periods WHERE code='Y2568'),
- (SELECT id FROM users WHERE email='eva.me@ccollege.ac.th'),
- (SELECT id FROM users WHERE email='t.me01@ccollege.ac.th'),
- (SELECT id FROM departments WHERE code='ME')),
-((SELECT id FROM evaluation_periods WHERE code='Y2568'),
- (SELECT id FROM users WHERE email='eva.it@ccollege.ac.th'),
- (SELECT id FROM users WHERE email='t.acc01@ccollege.ac.th'),
- (SELECT id FROM departments WHERE code='ACC'));
-
--- Bootstrap a sample result
-INSERT INTO evaluation_results (period_id, evaluatee_id, evaluator_id, topic_id, indicator_id, score, value_yes_no, notes, status)
-SELECT p.id, u_evale.id, u_evalr.id, t.id, i.id, 3.00, NULL, 'สื่อการสอนครบถ้วน เหมาะกับผู้เรียน', 'draft'
+SELECT p.id, er.id, ee.id, ee.department_id
 FROM evaluation_periods p
-JOIN users u_evale ON u_evale.email='t.it01@ccollege.ac.th'
-JOIN users u_evalr ON u_evalr.email='eva.it@ccollege.ac.th'
-JOIN evaluation_topics t ON t.code='TOP1'
-JOIN indicators i ON i.code='T1-MEDIA'
-WHERE p.code='Y2568';
+JOIN (
+  SELECT 'eva.it@ccollege.ac.th' er, 't.it01@ccollege.ac.th' ee
+  UNION ALL SELECT 'eva.me@ccollege.ac.th', 't.me01@ccollege.ac.th'
+  UNION ALL SELECT 'eva.it@ccollege.ac.th', 't.acc01@ccollege.ac.th'
+) m
+JOIN users er ON er.email = m.er
+JOIN users ee ON ee.email = m.ee
+WHERE p.code = 'R2-2569';
 
 -- View
 CREATE OR REPLACE VIEW v_evidence_progress AS
