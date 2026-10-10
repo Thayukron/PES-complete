@@ -1,0 +1,16 @@
+# Node.js
+node_modules/
+npm-debug.log
+.env
+build/
+dist/
+
+# Logs
+*.log
+
+# Build artifacts
+dist/
+build/
+frontend/.nuxt/
+frontend/.output/
+backend/uploads/

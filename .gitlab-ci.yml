@@ -1,0 +1,177 @@
+stages: [test, build, deploy]
+
+# ===== Global variables =====
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  IMAGE_TAG: "${CI_COMMIT_SHORT_SHA}"
+  BACKEND_IMAGE: "${CI_REGISTRY_IMAGE}/backend:${IMAGE_TAG}"
+  FRONTEND_IMAGE: "${CI_REGISTRY_IMAGE}/frontend:${IMAGE_TAG}"
+
+  # === Deploy target (Production) ===
+  DEPLOY_HOST: "172.16.3.105"
+  DEPLOY_PORT: "22"
+  DEPLOY_USER: "ubuntu"            # <-- เปลี่ยนเป็นผู้ใช้จริงบนเครื่องปลายทาง
+  DEPLOY_PATH: "/opt/skill_test_v2"
+
+default:
+  tags: [docker]                   # ให้ตรงกับ Runner ของคุณ
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - frontend/node_modules
+      - backend/node_modules
+
+# ===== TEST =====
+test_backend:
+  stage: test
+  image: node:20-alpine
+  script:
+    - cd backend
+    - npm ci
+    - npm run lint --if-present
+    - npm test --if-present
+  rules:
+    - changes: [ "backend/**" ]
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+test_frontend:
+  stage: test
+  image: node:20-alpine
+  script:
+    - cd frontend
+    - npm ci
+    - npm run lint --if-present
+    - npm test --if-present
+  rules:
+    - changes: [ "frontend/**" ]
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# ===== BUILD & PUSH (Docker-in-Docker) =====
+.build_template:
+  image: docker:26
+  services:
+    - docker:26-dind
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" "$CI_REGISTRY" --password-stdin
+
+build_backend:
+  stage: build
+  extends: .build_template
+  needs: ["test_backend"]
+  script:
+    - docker build -t "$BACKEND_IMAGE" ./backend
+    - docker push "$BACKEND_IMAGE"
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker tag "$BACKEND_IMAGE" "${CI_REGISTRY_IMAGE}/backend:latest"
+        docker push "${CI_REGISTRY_IMAGE}/backend:latest"
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      changes: [ "backend/**" ]
+
+build_frontend:
+  stage: build
+  extends: .build_template
+  needs: ["test_frontend"]
+  script:
+    - docker build -t "$FRONTEND_IMAGE" ./frontend
+    - docker push "$FRONTEND_IMAGE"
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker tag "$FRONTEND_IMAGE" "${CI_REGISTRY_IMAGE}/frontend:latest"
+        docker push "${CI_REGISTRY_IMAGE}/frontend:latest"
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      changes: [ "frontend/**" ]
+
+# ===== DEPLOY (SSH to 172.16.3.105 with docker compose) =====
+deploy_prod:
+  stage: deploy
+  image: alpine:3.20
+  needs: ["build_backend", "build_frontend"]
+  environment:
+    name: production
+    url: http://$DEPLOY_HOST:3000
+    on_stop: stop_prod
+  before_script:
+    - apk add --no-cache openssh-client rsync bash
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - echo "$DEPLOY_PRIV_KEY" > ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+    - |
+      # เพิ่ม fingerprint ของโฮสต์ (ป้องกัน MITM)
+      ssh-keyscan -p "${DEPLOY_PORT}" "$DEPLOY_HOST" >> ~/.ssh/known_hosts || true
+    - export REMOTE_DIR="${DEPLOY_PATH}"
+  script:
+    # เตรียมโฟลเดอร์ปลายทาง
+    - ssh -p "$DEPLOY_PORT" -i ~/.ssh/id_ed25519 "${DEPLOY_USER}@${DEPLOY_HOST}" "sudo mkdir -p $REMOTE_DIR/deploy && sudo chown -R \$USER:\$USER $REMOTE_DIR"
+
+    # ส่ง compose และไฟล์คอนฟิกที่ต้องใช้ไปเครื่องปลายทาง
+    - rsync -avz -e "ssh -p ${DEPLOY_PORT} -i ~/.ssh/id_ed25519" docker-compose.prod.yml "${DEPLOY_USER}@${DEPLOY_HOST}:$REMOTE_DIR/"
+    - rsync -avz -e "ssh -p ${DEPLOY_PORT} -i ~/.ssh/id_ed25519" deploy/ "${DEPLOY_USER}@${DEPLOY_HOST}:$REMOTE_DIR/deploy/"
+
+    # ล็อกอิน registry บนเครื่องปลายทาง (เพื่อดึงภาพ private)
+    - ssh -p "$DEPLOY_PORT" -i ~/.ssh/id_ed25519 "${DEPLOY_USER}@${DEPLOY_HOST}" "echo \"$CI_REGISTRY_PASSWORD\" | docker login -u \"$CI_REGISTRY_USER\" \"$CI_REGISTRY\" --password-stdin"
+
+    # ดึงอิมเมจ tag ล่าสุด และสตาร์ท
+    - >
+      ssh -p "$DEPLOY_PORT" -i ~/.ssh/id_ed25519 "${DEPLOY_USER}@${DEPLOY_HOST}"
+      "cd $REMOTE_DIR &&
+       IMAGE_TAG='${IMAGE_TAG}' NUXT_PUBLIC_API_BASE='http://localhost:7000'
+       docker compose -f docker-compose.prod.yml pull &&
+       IMAGE_TAG='${IMAGE_TAG}' NUXT_PUBLIC_API_BASE='http://localhost:7000'
+       docker compose -f docker-compose.prod.yml up -d --remove-orphans"
+  rules:
+    # deploy เฉพาะ branch main และเป็น Manual (กันพลาด)
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: false
+
+# ===== STOP Production (optional) =====
+stop_prod:
+  stage: deploy
+  image: alpine:3.20
+  environment:
+    name: production
+    action: stop
+  before_script:
+    - apk add --no-cache openssh-client
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - echo "$DEPLOY_PRIV_KEY" > ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+    - ssh-keyscan -p "${DEPLOY_PORT}" "$DEPLOY_HOST" >> ~/.ssh/known_hosts || true
+  script:
+    - ssh -p "$DEPLOY_PORT" -i ~/.ssh/id_ed25519 "${DEPLOY_USER}@${DEPLOY_HOST}" "cd ${DEPLOY_PATH} && docker compose -f docker-compose.prod.yml down"
+  rules:
+    - when: manual
+      allow_failure: true
+
+# =======================================================
+# สิ่งที่ต้องมีให้ครบก่อนกด Deploy
+
+# 1.GitLab Variables (Settings → CI/CD → Variables, ทำเป็น protected):
+
+# - DEPLOY_PRIV_KEY = SSH private key (ed25519) ของผู้ใช้บน 172.16.3.105
+
+# - (มีให้แล้ว) CI_REGISTRY_USER, CI_REGISTRY_PASSWORD จาก GitLab
+
+# - ถ้าผู้ใช้/พอร์ต/พาธต่างจากที่ตั้งไว้ ให้ override DEPLOY_USER, DEPLOY_PORT, DEPLOY_PATH
+
+# 2.บนเครื่อง 172.16.3.105
+
+# - ติดตั้ง Docker + Docker Compose plugin แล้ว
+
+# - เพิ่ม public key (คู่กับ DEPLOY_PRIV_KEY) ใน ~/.ssh/authorized_keys ของผู้ใช้ DEPLOY_USER
+
+# - โฟลเดอร์ /opt/skill_test_v2 จะถูกสร้างให้อัตโนมัติ
+
+# 3.ไฟล์ในรีโป
+
+# - docker-compose.prod.yml อ้างรูปอิมเมจ ${CI_REGISTRY_IMAGE}/backend:${IMAGE_TAG} และ ${CI_REGISTRY_IMAGE}/frontend:${IMAGE_TAG}
+
+# - โฟลเดอร์ deploy/ ใส่ไฟล์อย่าง backend.env (DB/JWT/CORS), ฯลฯ ที่ต้องใช้บน Production
+
+# - พร้อมใช้งานครับ: push เข้า main → ไปที่ Pipelines → deploy_prod (manual) → ระบบจะ rsync ไฟล์, login registry, pull & up -d บน 172.16.3.105 ให้เลย 🚀
