@@ -51,20 +51,13 @@
           <v-chip v-if="item.level" :color="levelColor(item.level)" size="small" variant="flat">{{ item.level }}</v-chip>
           <span v-else>-</span>
         </template>
-        <template #item.pa_percent="{ item }">
-          <span v-if="item.pa_percent === null" class="text-medium-emphasis">-</span>
-          <span v-else>
-            {{ pct(item.pa_percent).replace('%', '') }}
-            <v-chip :color="item.pa_pass ? 'success' : 'error'" size="x-small" variant="tonal" class="ml-1">{{ item.pa_pass ? 'ผ่าน' : 'ไม่ผ่าน' }}</v-chip>
-          </span>
-        </template>
         <template #item.actions="{ item }">
           <v-btn :to="`/report/${item.evaluatee_id}`" size="small" variant="text" color="primary" prepend-icon="mdi-file-document-outline" class="no-print">รายงาน</v-btn>
         </template>
       </v-data-table>
     </v-card>
     <div class="text-caption text-medium-emphasis mt-2">
-      * คะแนนคิดจากผลที่กรรมการ "ส่งแล้ว" เท่านั้น (หากมีกรรมการหลายท่านใช้ค่าเฉลี่ย) · เกณฑ์: ≥90 ดีเด่น, ≥80 ดีมาก, ≥70 ดี, ≥60 พอใช้, &lt;60 ปรับปรุง
+      * คะแนนคิดจากผลที่กรรมการ "ส่งแล้ว" เท่านั้น (หากมีกรรมการหลายท่านใช้ค่าเฉลี่ย) · เกณฑ์: ≥90 ดีเยี่ยม, ≥80 ดีมาก, ≥70 ดี, ≥60 พอใช้, &lt;60 ต้องปรับปรุง
     </div>
   </div>
 </template>
@@ -76,16 +69,15 @@ const props = defineProps({
   periodName: { type: String, default: '' },
 })
 
-const levels = ['ดีเด่น', 'ดีมาก', 'ดี', 'พอใช้', 'ปรับปรุง']
+const levels = ['ดีเยี่ยม', 'ดีมาก', 'ดี', 'พอใช้', 'ต้องปรับปรุง']
 const search = ref('')
 const headers = [
   { title: 'ที่', key: 'no', sortable: false, width: 50 },
   { title: 'ครูผู้รับการประเมิน', key: 'name_th' },
   { title: 'หลักฐาน (ตัวชี้วัด)', key: 'indicators_with_files', value: (r) => `${r.indicators_with_files}/${r.indicators_total}` },
   { title: 'กรรมการส่งผล', key: 'evaluators', sortable: false },
-  { title: 'คะแนนเลื่อนเงินเดือน (100)', key: 'percent' },
+  { title: 'คะแนนรวม', key: 'percent' },
   { title: 'ระดับ', key: 'level' },
-  { title: 'PA (100)', key: 'pa_percent' },
   { title: '', key: 'actions', sortable: false, align: 'end' },
 ]
 
@@ -93,10 +85,10 @@ const done = computed(() => props.rows.filter((r) => r.percent !== null))
 const avg = computed(() => (done.value.length ? done.value.reduce((s, r) => s + r.percent, 0) / done.value.length : null))
 
 function exportCsv() {
-  const head = ['ที่', 'ชื่อ-นามสกุล', 'อีเมล', 'แผนกวิชา', 'ตัวชี้วัดที่มีหลักฐาน', 'ตัวชี้วัดทั้งหมด', 'ประเมินตนเอง', 'กรรมการส่งผล', 'กรรมการทั้งหมด', 'คะแนนเลื่อนเงินเดือน (100)', 'ระดับ', 'คะแนน PA (100)', 'ผล PA']
+  const head = ['ที่', 'ชื่อ-นามสกุล', 'อีเมล', 'แผนกวิชา', 'ตัวชี้วัดที่มีหลักฐาน', 'ตัวชี้วัดทั้งหมด', 'ประเมินตนเอง', 'กรรมการส่งผล', 'กรรมการทั้งหมด', 'คะแนนรวม (%)', 'ระดับ']
   const data = props.rows.map((r, i) => [
     i + 1, r.name_th, r.email, r.department_name || '', r.indicators_with_files, r.indicators_total,
-    STATUS[r.self_status].text, r.evaluators_submitted, r.evaluators.length, r.percent ?? '', r.level ?? '', r.pa_percent ?? '', r.pa_pass === null || r.pa_pass === undefined ? '' : r.pa_pass ? 'ผ่าน' : 'ไม่ผ่าน',
+    STATUS[r.self_status].text, r.evaluators_submitted, r.evaluators.length, r.percent ?? '', r.level ?? '',
   ])
   downloadCsv(`สรุปผลการประเมิน_${props.periodName || 'รอบ'}.csv`, head, data)
 }

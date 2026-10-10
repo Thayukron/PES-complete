@@ -26,7 +26,7 @@
         <v-card-title class="d-flex align-center ga-2">
           <v-chip size="small" color="primary" variant="flat">{{ t.code }}</v-chip>
           {{ t.title_th }}
-          <v-chip size="small" variant="tonal">{{ (Number(t.weight) * 100).toFixed(0) }} คะแนน</v-chip>
+          <v-chip size="small" variant="tonal">น้ำหนัก {{ Number(t.weight).toFixed(2) }}</v-chip>
         </v-card-title>
         <v-divider />
         <div v-for="(i, idx) in t.indicators" :key="i.id">

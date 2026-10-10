@@ -5,14 +5,8 @@
       <v-btn color="primary" prepend-icon="mdi-plus" @click="openTopic()">เพิ่มด้าน</v-btn>
     </PageHeader>
 
-    <v-alert type="info" variant="tonal" density="compact" class="mb-4">
-      แต่ละด้านมีน้ำหนัก 2 ชุด: <strong>แบบประเมินผลการปฏิบัติงาน (เลื่อนเงินเดือน)</strong> และ <strong>แบบประเมิน PA</strong>
-      — น้ำหนัก 0.32 = 32 คะแนนจาก 100 · น้ำหนัก PA เป็น 0 = ไม่นับในแบบ PA
-      <div class="mt-1">
-        รวมน้ำหนักเงินเดือน = <strong :class="weightSum === 1 ? 'text-success' : 'text-error'">{{ weightSum.toFixed(2) }}</strong> ·
-        รวมน้ำหนัก PA = <strong :class="paWeightSum === 1 ? 'text-success' : 'text-error'">{{ paWeightSum.toFixed(2) }}</strong>
-        <span v-if="weightSum !== 1 || paWeightSum !== 1"> (ควรรวมได้ 1.00 ระบบจะคำนวณเป็นสัดส่วนให้)</span>
-      </div>
+    <v-alert v-if="weightSum !== 1 && topics.length" type="warning" variant="tonal" density="compact" class="mb-4">
+      น้ำหนักรวมของด้านที่เปิดใช้งาน = {{ weightSum }} (แนะนำให้รวมได้ 1.00 เช่น 0.30 + 0.20 + 0.30 + 0.20) — ระบบจะคำนวณเป็นสัดส่วนให้อัตโนมัติ
     </v-alert>
 
     <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-2" />
@@ -23,8 +17,7 @@
           <div class="d-flex flex-wrap align-center ga-2 w-100">
             <v-chip size="small" color="primary" variant="flat">{{ t.code }}</v-chip>
             <strong>{{ t.title_th }}</strong>
-            <v-chip size="small" variant="tonal">เงินเดือน {{ (Number(t.weight) * 100).toFixed(0) }} คะแนน</v-chip>
-            <v-chip size="small" variant="tonal" :color="Number(t.pa_weight) ? 'indigo' : undefined">PA {{ Number(t.pa_weight) ? (Number(t.pa_weight) * 100).toFixed(0) + ' คะแนน' : 'ไม่นับ' }}</v-chip>
+            <v-chip size="small" variant="tonal">น้ำหนัก {{ Number(t.weight).toFixed(2) }}</v-chip>
             <v-chip size="small" variant="tonal">{{ t.indicators.length }} ตัวชี้วัด</v-chip>
             <v-chip v-if="!t.active" size="small" color="grey">ปิดใช้งาน</v-chip>
           </div>
@@ -79,12 +72,9 @@
               <v-col cols="12" sm="8"><v-text-field v-model="topicForm.title_th" label="ชื่อด้าน *" :rules="[req]" /></v-col>
               <v-col cols="12"><v-textarea v-model="topicForm.description" label="คำอธิบาย" /></v-col>
               <v-col cols="12" sm="6">
-                <v-text-field v-model.number="topicForm.weight" label="น้ำหนักแบบประเมินเงินเดือน (เช่น 0.32)" type="number" step="0.01" min="0" :rules="[(v) => v >= 0 || 'ต้องไม่ติดลบ']" />
+                <v-text-field v-model.number="topicForm.weight" label="น้ำหนัก (เช่น 0.30)" type="number" step="0.05" min="0" :rules="[(v) => v >= 0 || 'ต้องไม่ติดลบ']" />
               </v-col>
-              <v-col cols="12" sm="6">
-                <v-text-field v-model.number="topicForm.pa_weight" label="น้ำหนักแบบประเมิน PA (0 = ไม่นับ)" type="number" step="0.01" min="0" :rules="[(v) => v >= 0 || 'ต้องไม่ติดลบ']" />
-              </v-col>
-              <v-col cols="12"><v-switch v-model="topicForm.active" label="เปิดใช้งาน" color="success" inset hide-details /></v-col>
+              <v-col cols="12" sm="6"><v-switch v-model="topicForm.active" label="เปิดใช้งาน" color="success" inset hide-details /></v-col>
             </v-row>
           </v-form>
         </v-card-text>
@@ -162,9 +152,7 @@ const showInactive = ref(false)
 
 const visibleTopics = computed(() => topics.value.filter((t) => showInactive.value || t.active))
 const visibleIndicators = (t) => t.indicators.filter((i) => showInactive.value || i.active)
-const sumOf = (key) => Math.round(topics.value.filter((t) => t.active).reduce((s, t) => s + Number(t[key] || 0), 0) * 100) / 100
-const weightSum = computed(() => sumOf('weight'))
-const paWeightSum = computed(() => sumOf('pa_weight'))
+const weightSum = computed(() => Math.round(topics.value.filter((t) => t.active).reduce((s, t) => s + Number(t.weight), 0) * 100) / 100)
 
 async function load() {
   loading.value = true
@@ -188,7 +176,7 @@ const topicDialog = ref(false)
 const topicRef = ref()
 const topicForm = ref({})
 function openTopic(t) {
-  topicForm.value = t ? { ...t, active: !!t.active } : { id: null, code: `TOP${topics.value.length + 1}`, title_th: '', description: '', weight: 0, pa_weight: 0, active: true }
+  topicForm.value = t ? { ...t, active: !!t.active } : { id: null, code: `TOP${topics.value.length + 1}`, title_th: '', description: '', weight: 0, active: true }
   topicDialog.value = true
 }
 async function saveTopic() {

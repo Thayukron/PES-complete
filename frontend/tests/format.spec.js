@@ -23,7 +23,7 @@ describe('utils/format', () => {
     expect(valueText({ type: 'yes_no' }, null)).toBe('-')
   })
   it('สีตามระดับผลการประเมิน', () => {
-    expect(levelColor('ดีเด่น')).toBe('success')
+    expect(levelColor('ดีเยี่ยม')).toBe('success')
     expect(levelColor('ไม่รู้จัก')).toBe('grey')
   })
 })

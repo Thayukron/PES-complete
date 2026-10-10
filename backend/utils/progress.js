@@ -2,7 +2,7 @@
 // รวบรวมความคืบหน้าของครูหลายคนในคราวเดียว (ใช้ในหน้ารายการงาน/ติดตาม/รายงาน)
 const db = require('../db/knex');
 const { loadTopics } = require('../controllers/topics.controller');
-const { computeTotals, averageValues, paResult } = require('./scoring');
+const { computeTotals, averageValues } = require('./scoring');
 
 /**
  * @param periodId รอบการประเมิน
@@ -54,9 +54,6 @@ async function summarize(periodId, pairs) {
       if (avg) values[iid] = avg;
     }
     const totals = submitted.length ? computeTotals(topics, values) : { percent: null, level: null };
-    const paTotals = submitted.length ? computeTotals(topics, values, 'pa_weight') : { percent: null };
-    const pa = paResult(topics, [...new Set(submitted.map((r) => r.evaluator_id))].map((id) =>
-      Object.fromEntries(submitted.filter((r) => r.evaluator_id === id).map((r) => [r.indicator_id, r]))));
 
     return {
       evaluatee_id: eid,
@@ -72,8 +69,6 @@ async function summarize(periodId, pairs) {
       evaluators_submitted: evaluators.filter((e) => e.status === 'submitted').length,
       percent: totals.percent,
       level: totals.level,
-      pa_percent: paTotals.percent,
-      pa_pass: pa.pass,
     };
   });
 }

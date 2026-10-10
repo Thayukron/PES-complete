@@ -10,8 +10,7 @@
       <v-card-title class="d-flex flex-wrap align-center ga-2">
         <v-chip size="small" color="primary" variant="flat">{{ t.code }}</v-chip>
         {{ t.title_th }}
-        <v-chip size="small" variant="tonal">เงินเดือน {{ (Number(t.weight) * 100).toFixed(0) }} คะแนน</v-chip>
-        <v-chip v-if="Number(t.pa_weight)" size="small" variant="tonal" color="indigo">PA {{ (Number(t.pa_weight) * 100).toFixed(0) }} คะแนน</v-chip>
+        <v-chip size="small" variant="tonal">น้ำหนัก {{ (Number(t.weight) * 100).toFixed(0) }}%</v-chip>
       </v-card-title>
       <v-card-subtitle v-if="t.description" class="text-wrap">{{ t.description }}</v-card-subtitle>
       <v-table density="comfortable" class="mt-2">

@@ -191,7 +191,7 @@ describe.skipIf(!dbReady)('API integration', () => {
   })
 
   // ---------------- Self assessment ----------------
-  const fullItems = () => indicators.map((i) => (i.type === 'score_1_4' ? { indicator_id: i.id, score: i.max_score } : { indicator_id: i.id, value_yes_no: 1 }))
+  const fullItems = () => indicators.map((i) => (i.type === 'score_1_4' ? { indicator_id: i.id, score: 4 } : { indicator_id: i.id, value_yes_no: 1 }))
 
   it('ประเมินตนเอง: ร่าง → ส่ง (ต้องครบ) → ล็อก → admin เปิดให้แก้', async () => {
     let r = await api('put', '/api/self-assessments', 'teacher').send({ period_id: period.id, items: fullItems().slice(0, 2) })

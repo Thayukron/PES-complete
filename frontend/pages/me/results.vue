@@ -15,19 +15,11 @@
 
       <v-row class="mb-2">
         <v-col cols="12" md="4">
-          <v-card class="mb-4 text-center" :color="r.totals.level ? levelColor(r.totals.level) : undefined" variant="tonal">
+          <v-card class="h-100 text-center" :color="r.totals.level ? levelColor(r.totals.level) : undefined" variant="tonal">
             <v-card-text>
-              <div class="text-body-2">แบบประเมินผลการปฏิบัติงาน (เลื่อนเงินเดือน)</div>
-              <div class="text-h3 font-weight-bold my-2">{{ score(r.totals.percent) }}<span class="text-h6"> / 100</span></div>
+              <div class="text-body-2">คะแนนรวมจากกรรมการ</div>
+              <div class="text-h3 font-weight-bold my-2">{{ pct(r.totals.percent) }}</div>
               <div class="text-h6">{{ r.totals.level || 'รอผลการประเมิน' }}</div>
-            </v-card-text>
-          </v-card>
-          <v-card class="text-center" :color="r.pa_totals.pass === null ? undefined : r.pa_totals.pass ? 'success' : 'error'" variant="tonal">
-            <v-card-text>
-              <div class="text-body-2">แบบประเมิน PA (PA2/ส)</div>
-              <div class="text-h4 font-weight-bold my-2">{{ score(r.pa_totals.percent) }}<span class="text-h6"> / 100</span></div>
-              <div class="text-h6">{{ r.pa_totals.pass === null ? 'รอผลการประเมิน' : r.pa_totals.pass ? 'ผ่านเกณฑ์' : 'ไม่ผ่านเกณฑ์' }}</div>
-              <div class="text-caption">เกณฑ์: กรรมการแต่ละคนให้ไม่ต่ำกว่าร้อยละ {{ r.pa_totals.pass_percent }}</div>
             </v-card-text>
           </v-card>
         </v-col>
@@ -37,8 +29,8 @@
             <v-card-text>
               <div v-for="t in r.topics" :key="t.id" class="mb-3">
                 <div class="d-flex justify-space-between text-body-2 mb-1">
-                  <span>{{ t.title_th }}</span>
-                  <span class="text-no-wrap ml-2">กรรมการ <strong>{{ score(t.points) }}</strong> · ตนเอง {{ score(t.self_points) }} / {{ score(t.full_points) }} คะแนน</span>
+                  <span>{{ t.code }} {{ t.title_th }} <span class="text-medium-emphasis">(น้ำหนัก {{ (t.weight * 100).toFixed(0) }}%)</span></span>
+                  <span>กรรมการ <strong>{{ pct(t.percent) }}</strong> · ตนเอง {{ pct(t.self_percent) }}</span>
                 </div>
                 <v-progress-linear :model-value="t.percent || 0" height="10" rounded color="primary" />
               </div>
@@ -87,7 +79,6 @@
 definePageMeta({ roles: ['evaluatee'] })
 
 const { r, loading, load } = useEvaluateeReport(() => useAuthStore().user?.id)
-const score = (v) => (v === null || v === undefined ? '-' : Number(v).toFixed(2).replace(/.00$/, ''))
 const submittedCount = computed(() => r.value?.evaluators.filter((e) => e.status === 'submitted').length || 0)
 onMounted(load)
 </script>

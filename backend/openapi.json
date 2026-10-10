@@ -732,12 +732,7 @@
                     "type": "string"
                   },
                   "weight": {
-                    "type": "number",
-                    "description": "น้ำหนักแบบประเมินเงินเดือน (0.32 = 32 คะแนน)"
-                  },
-                  "pa_weight": {
-                    "type": "number",
-                    "description": "น้ำหนักแบบ PA (0 = ไม่นับ)"
+                    "type": "number"
                   },
                   "active": {
                     "type": "boolean"

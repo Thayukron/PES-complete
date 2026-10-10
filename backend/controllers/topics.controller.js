@@ -24,7 +24,6 @@ async function loadTopics({ activeOnly = true } = {}) {
   return topics.map((t) => ({
     ...t,
     weight: Number(t.weight),
-    pa_weight: Number(t.pa_weight),
     indicators: indicators
       .filter((i) => i.topic_id === t.id)
       .map((i) => ({
@@ -69,13 +68,11 @@ function pickTopic(b) {
     title_th: String(b.title_th || '').trim(),
     description: b.description ? String(b.description).trim() : null,
     weight: Number(b.weight ?? 0),
-    pa_weight: Number(b.pa_weight ?? 0),
     active: b.active === undefined ? 1 : (b.active ? 1 : 0),
   };
   if (!data.code) throw httpError(422, 'กรุณากรอกรหัสด้าน');
   if (!data.title_th) throw httpError(422, 'กรุณากรอกชื่อด้าน');
   if (!(data.weight >= 0 && data.weight <= 100)) throw httpError(422, 'น้ำหนักไม่ถูกต้อง');
-  if (!(data.pa_weight >= 0 && data.pa_weight <= 100)) throw httpError(422, 'น้ำหนัก PA ไม่ถูกต้อง');
   return data;
 }
 

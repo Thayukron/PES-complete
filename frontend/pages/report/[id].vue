@@ -35,14 +35,14 @@
           <thead>
             <tr>
               <th style="width: 120px">รหัส</th><th>ตัวชี้วัด</th><th style="width: 70px">หลักฐาน</th>
-              <th style="width: 90px">ตนเอง</th><th style="width: 90px">กรรมการ</th><th style="width: 90px">ร้อยละ / คะแนน</th>
+              <th style="width: 90px">ตนเอง</th><th style="width: 90px">กรรมการ</th><th style="width: 80px">ร้อยละ</th>
             </tr>
           </thead>
           <tbody>
             <template v-for="t in r.topics" :key="t.id">
               <tr class="topic">
-                <td colspan="5">{{ t.code }} {{ t.title_th }}</td>
-                <td class="num">{{ num(t.points) }} / {{ num(t.full_points) }}</td>
+                <td colspan="5">{{ t.code }} {{ t.title_th }} (น้ำหนัก {{ (t.weight * 100).toFixed(0) }}%)</td>
+                <td class="num">{{ pct(t.percent) }}</td>
               </tr>
               <tr v-for="i in t.indicators" :key="i.id">
                 <td class="text-no-wrap">{{ i.code }}</td>
@@ -56,55 +56,13 @@
                 <td class="num">{{ pct(i.final?.percent) }}</td>
               </tr>
             </template>
+            <tr class="total">
+              <td colspan="3">คะแนนรวม</td>
+              <td class="num">{{ pct(r.self_totals.percent) }}</td>
+              <td colspan="2" class="num">{{ pct(r.totals.percent) }} {{ r.totals.level ? `(${r.totals.level})` : '' }}</td>
+            </tr>
           </tbody>
         </table>
-
-        <!-- สรุปคะแนนตามแบบฟอร์มทั้ง 2 แบบ -->
-        <v-row class="mt-4">
-          <v-col cols="12" md="7">
-            <div class="font-weight-bold mb-1">สรุปผลแบบประเมินผลการปฏิบัติงาน (เลื่อนเงินเดือน)</div>
-            <table class="rpt">
-              <thead><tr><th>องค์ประกอบ/ด้าน</th><th class="num">เต็ม</th><th class="num">ตนเอง</th><th class="num">ผู้บังคับบัญชา/กรรมการ</th></tr></thead>
-              <tbody>
-                <tr v-for="t in r.topics.filter((x) => x.full_points)" :key="t.id">
-                  <td>{{ t.title_th }}</td><td class="num">{{ num(t.full_points) }}</td>
-                  <td class="num">{{ num(t.self_points) }}</td><td class="num">{{ num(t.points) }}</td>
-                </tr>
-                <tr class="total">
-                  <td>คะแนนรวม</td><td class="num">100</td>
-                  <td class="num">{{ num(r.self_totals.percent) }}</td>
-                  <td class="num">{{ num(r.totals.percent) }} {{ r.totals.level ? `(${r.totals.level})` : '' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </v-col>
-          <v-col cols="12" md="5">
-            <div class="font-weight-bold mb-1">สรุปผลแบบประเมิน PA (PA2/ส)</div>
-            <table class="rpt">
-              <thead><tr><th>ส่วน/ด้าน</th><th class="num">เต็ม</th><th class="num">ตนเอง</th><th class="num">กรรมการ</th></tr></thead>
-              <tbody>
-                <tr v-for="t in r.topics.filter((x) => x.pa_full_points)" :key="t.id">
-                  <td>{{ t.title_th }}</td><td class="num">{{ num(t.pa_full_points) }}</td>
-                  <td class="num">{{ num(t.pa_self_points) }}</td><td class="num">{{ num(t.pa_points) }}</td>
-                </tr>
-                <tr class="total">
-                  <td>คะแนนรวม</td><td class="num">100</td>
-                  <td class="num">{{ num(r.pa_totals.self_percent) }}</td>
-                  <td class="num">{{ num(r.pa_totals.percent) }}</td>
-                </tr>
-                <tr>
-                  <td colspan="4">
-                    เกณฑ์ผ่าน: ได้คะแนนจากกรรมการแต่ละคนไม่ต่ำกว่าร้อยละ {{ r.pa_totals.pass_percent }} —
-                    <strong v-if="r.pa_totals.pass === null">รอผลการประเมิน</strong>
-                    <strong v-else :class="r.pa_totals.pass ? 'text-success' : 'text-error'">
-                      {{ r.pa_totals.pass ? 'ผ่าน' : 'ไม่ผ่าน' }} (ต่ำสุด {{ num(r.pa_totals.min_percent) }})
-                    </strong>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </v-col>
-        </v-row>
 
         <div class="mt-4">
           <div class="font-weight-bold mb-1">ข้อเสนอแนะจากกรรมการ</div>
@@ -123,7 +81,7 @@
           </div>
         </div>
         <div class="text-caption text-medium-emphasis mt-6">
-          พิมพ์เมื่อ {{ thDate(new Date().toISOString().slice(0, 16).replace('T', ' '), true) }} · เกณฑ์ระดับ: ≥90 ดีเด่น, ≥80 ดีมาก, ≥70 ดี, ≥60 พอใช้, &lt;60 ปรับปรุง
+          พิมพ์เมื่อ {{ thDate(new Date().toISOString().slice(0, 16).replace('T', ' '), true) }} · เกณฑ์ระดับ: ≥90 ดีเยี่ยม, ≥80 ดีมาก, ≥70 ดี, ≥60 พอใช้, &lt;60 ต้องปรับปรุง
         </div>
       </v-card-text>
     </v-card>
@@ -141,7 +99,6 @@ const { r, loading, load } = useEvaluateeReport(() => evaluateeId.value)
 onMounted(load)
 
 const print = () => window.print()
-const num = (v) => (v === null || v === undefined ? '-' : Number(v).toFixed(2).replace(/\.00$/, ''))
 
 function exportCsv() {
   const rows = []
