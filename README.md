@@ -150,7 +150,7 @@ frontend/
 
 ## ตาราง API หลัก
 
-ดูทั้งหมดและทดลองยิงได้ที่ http://localhost:7000/docs (กด Authorize แล้วใส่ token จาก `/api/auth/login`)
+คำอธิบายการออกแบบ RESTful, ความสัมพันธ์ของทรัพยากร และตัวอย่างการเรียกใช้: ดู [API.md](API.md) · ทดลองยิงได้ที่ http://localhost:7000/docs (กด Authorize แล้วใส่ token จาก `/api/auth/login`)
 
 | Method | Path | สิทธิ์ |
 |---|---|---|
