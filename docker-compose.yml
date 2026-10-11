@@ -5,6 +5,9 @@
 # phpMyAdmin:  http://localhost:8082
 # ล้างฐานข้อมูลแล้วเริ่มใหม่ (โหลด schema.sql อีกครั้ง):  docker compose down -v && docker compose up -d --build
 
+# ชื่อโปรเจกต์ Docker (แยก container/volume จากอีกชุด)
+name: pes-skill
+
 services:
   db:
     image: mysql:8.0
